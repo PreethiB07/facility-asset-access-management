@@ -21,6 +21,7 @@ import {
   rejectAccessRequestSchema,
 } from '../validators/access-request.validators';
 import { formatZodError } from '../validators/auth.validators';
+import { getCompanyContextFromRequest } from '../utils/company-context';
 
 function parseRequestId(id: string | string[]): string {
   const value = getRouteParam(id);
@@ -30,23 +31,16 @@ function parseRequestId(id: string | string[]): string {
   return value;
 }
 
-function requireAuthenticatedUser(req: Request): { id: string } {
-  if (!req.user) {
-    throw new AppError(401, ErrorCodes.UNAUTHORIZED, 'Authentication required');
-  }
-  return req.user;
-}
-
 export async function createAccessRequestHandler(
   req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    const user = requireAuthenticatedUser(req);
+    const { companyId, userId } = getCompanyContextFromRequest(req);
     const body = parseBody(createAccessRequestSchema, req.body);
     const input = mapCreateBodyToInput(body);
-    const request = await createAccessRequest(user.id, input);
+    const request = await createAccessRequest(userId, input, companyId);
     sendData(res, request, 201);
   } catch (error) {
     next(error);
@@ -59,7 +53,7 @@ export async function listAccessRequestsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const user = requireAuthenticatedUser(req);
+    const { companyId, userId } = getCompanyContextFromRequest(req);
     const statusParam = req.query.status as string | undefined;
     let status: AccessRequestStatus | undefined;
 
@@ -74,7 +68,7 @@ export async function listAccessRequestsHandler(
       }
     }
 
-    const requests = await listMyAccessRequests(user.id, status);
+    const requests = await listMyAccessRequests(userId, companyId, status);
     sendList(res, requests);
   } catch (error) {
     next(error);
@@ -87,9 +81,9 @@ export async function getAccessRequestHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const user = requireAuthenticatedUser(req);
+    const { companyId, userId } = getCompanyContextFromRequest(req);
     const requestId = parseRequestId(req.params.id);
-    const request = await getAccessRequestById(requestId, user.id);
+    const request = await getAccessRequestById(requestId, userId, companyId);
     sendData(res, request);
   } catch (error) {
     next(error);
@@ -102,8 +96,8 @@ export async function getMyAccessHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const user = requireAuthenticatedUser(req);
-    const access = await getCurrentAccess(user.id);
+    const { companyId, userId } = getCompanyContextFromRequest(req);
+    const access = await getCurrentAccess(userId, companyId);
     sendList(res, access);
   } catch (error) {
     next(error);
@@ -111,12 +105,13 @@ export async function getMyAccessHandler(
 }
 
 export async function listPendingAccessRequestsHandler(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    const requests = await listPendingAccessRequests();
+    const { companyId } = getCompanyContextFromRequest(req);
+    const requests = await listPendingAccessRequests(companyId);
     sendList(res, requests);
   } catch (error) {
     next(error);
@@ -129,9 +124,9 @@ export async function approveAccessRequestHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const user = requireAuthenticatedUser(req);
+    const { companyId, userId } = getCompanyContextFromRequest(req);
     const requestId = parseRequestId(req.params.id);
-    const result = await approveAccessRequest(requestId, user.id);
+    const result = await approveAccessRequest(requestId, userId, companyId);
     sendData(res, result);
   } catch (error) {
     next(error);
@@ -144,10 +139,10 @@ export async function rejectAccessRequestHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const user = requireAuthenticatedUser(req);
+    const { companyId, userId } = getCompanyContextFromRequest(req);
     const requestId = parseRequestId(req.params.id);
     const body = parseBody(rejectAccessRequestSchema, req.body);
-    const result = await rejectAccessRequest(requestId, user.id, body.rejectionReason);
+    const result = await rejectAccessRequest(requestId, userId, body.rejectionReason, companyId);
     sendData(res, result);
   } catch (error) {
     next(error);

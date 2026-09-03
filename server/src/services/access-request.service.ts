@@ -121,9 +121,14 @@ interface ResolvedTarget {
   requiresApproval: boolean;
 }
 
-async function resolveAndValidateTarget(input: CreateAccessRequestInput): Promise<ResolvedTarget> {
+async function resolveAndValidateTarget(
+  input: CreateAccessRequestInput,
+  companyId: string,
+): Promise<ResolvedTarget> {
   if (input.facilityId) {
-    const facility = await prisma.facility.findUnique({ where: { id: input.facilityId } });
+    const facility = await prisma.facility.findFirst({
+      where: { id: input.facilityId, companyId },
+    });
     if (!facility) {
       throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
     }
@@ -139,8 +144,8 @@ async function resolveAndValidateTarget(input: CreateAccessRequestInput): Promis
   }
 
   if (input.areaId) {
-    const area = await prisma.area.findUnique({
-      where: { id: input.areaId },
+    const area = await prisma.area.findFirst({
+      where: { id: input.areaId, companyId },
       include: { facility: true },
     });
     if (!area) {
@@ -161,8 +166,8 @@ async function resolveAndValidateTarget(input: CreateAccessRequestInput): Promis
   }
 
   if (input.assetId) {
-    const asset = await prisma.asset.findUnique({
-      where: { id: input.assetId },
+    const asset = await prisma.asset.findFirst({
+      where: { id: input.assetId, companyId },
       include: { facility: true, area: true },
     });
     if (!asset) {
@@ -290,9 +295,12 @@ function toPendingAccessRequestResponse(
   };
 }
 
-async function loadManagerRequest(requestId: string): Promise<AccessRequestWithRequester> {
-  const request = await prisma.accessRequest.findUnique({
-    where: { id: requestId },
+async function loadManagerRequest(
+  requestId: string,
+  companyId: string,
+): Promise<AccessRequestWithRequester> {
+  const request = await prisma.accessRequest.findFirst({
+    where: { id: requestId, companyId },
     include: managerAccessRequestInclude,
   });
 
@@ -306,17 +314,18 @@ async function loadManagerRequest(requestId: string): Promise<AccessRequestWithR
 export async function createAccessRequest(
   requesterId: string,
   input: CreateAccessRequestInput,
+  companyId: string,
 ): Promise<AccessRequestResponse> {
-  const requester = await prisma.user.findUnique({
-    where: { id: requesterId },
-    select: { companyId: true },
+  const requester = await prisma.user.findFirst({
+    where: { id: requesterId, companyId },
+    select: { id: true },
   });
 
   if (!requester) {
     throw new AppError(404, ErrorCodes.NOT_FOUND, 'Requester not found');
   }
 
-  const target = await resolveAndValidateTarget(input);
+  const target = await resolveAndValidateTarget(input, companyId);
   const now = new Date();
 
   const status = target.requiresApproval
@@ -325,7 +334,7 @@ export async function createAccessRequest(
 
   const request = await prisma.accessRequest.create({
     data: {
-      companyId: requester.companyId,
+      companyId,
       requesterId,
       facilityId: target.facilityId,
       areaId: target.areaId,
@@ -346,11 +355,13 @@ export async function createAccessRequest(
 
 export async function listMyAccessRequests(
   requesterId: string,
+  companyId: string,
   status?: AccessRequestStatus,
 ): Promise<AccessRequestResponse[]> {
   const requests = await prisma.accessRequest.findMany({
     where: {
       requesterId,
+      companyId,
       ...(status ? { status } : {}),
     },
     include: accessRequestInclude,
@@ -363,9 +374,10 @@ export async function listMyAccessRequests(
 export async function getAccessRequestById(
   requestId: string,
   requesterId: string,
+  companyId: string,
 ): Promise<AccessRequestResponse> {
   const request = await prisma.accessRequest.findFirst({
-    where: { id: requestId, requesterId },
+    where: { id: requestId, requesterId, companyId },
     include: accessRequestInclude,
   });
 
@@ -378,11 +390,13 @@ export async function getAccessRequestById(
 
 export async function getCurrentAccess(
   requesterId: string,
+  companyId: string,
   now: Date = new Date(),
 ): Promise<CurrentAccessResponse[]> {
   const requests = await prisma.accessRequest.findMany({
     where: {
       requesterId,
+      companyId,
       status: AccessRequestStatus.APPROVED,
       startAt: { lte: now },
       OR: [
@@ -430,9 +444,11 @@ export function mapCreateBodyToInput(body: {
   };
 }
 
-export async function listPendingAccessRequests(): Promise<PendingAccessRequestResponse[]> {
+export async function listPendingAccessRequests(
+  companyId: string,
+): Promise<PendingAccessRequestResponse[]> {
   const requests = await prisma.accessRequest.findMany({
-    where: { status: AccessRequestStatus.PENDING },
+    where: { companyId, status: AccessRequestStatus.PENDING },
     include: managerAccessRequestInclude,
     orderBy: { createdAt: 'asc' },
   });
@@ -445,9 +461,10 @@ export async function listPendingAccessRequests(): Promise<PendingAccessRequestR
 export async function approveAccessRequest(
   requestId: string,
   approverId: string,
+  companyId: string,
   now: Date = new Date(),
 ): Promise<ManagerActionResponse> {
-  const request = await loadManagerRequest(requestId);
+  const request = await loadManagerRequest(requestId, companyId);
   assertPendingStatus(request.status);
   validateTargetEligibleForApproval(request);
   validateAccessPeriodForApproval(request, now);
@@ -473,7 +490,7 @@ export async function approveAccessRequest(
     );
   }
 
-  const updated = await loadManagerRequest(requestId);
+  const updated = await loadManagerRequest(requestId, companyId);
   return toManagerActionResponse(updated);
 }
 
@@ -481,9 +498,10 @@ export async function rejectAccessRequest(
   requestId: string,
   approverId: string,
   rejectionReason: string,
+  companyId: string,
   now: Date = new Date(),
 ): Promise<ManagerActionResponse> {
-  const request = await loadManagerRequest(requestId);
+  const request = await loadManagerRequest(requestId, companyId);
   assertPendingStatus(request.status);
 
   const updateResult = await prisma.accessRequest.updateMany({
@@ -507,6 +525,6 @@ export async function rejectAccessRequest(
     );
   }
 
-  const updated = await loadManagerRequest(requestId);
+  const updated = await loadManagerRequest(requestId, companyId);
   return toManagerActionResponse(updated);
 }
