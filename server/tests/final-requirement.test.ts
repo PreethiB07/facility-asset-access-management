@@ -1,7 +1,11 @@
 import request from 'supertest';
+import { Role } from '@prisma/client';
+import bcrypt from 'bcrypt';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import app from '../src/app';
+import { LEGACY_COMPANY_ID } from '../src/constants/company.constants';
 import { getDb } from '../src/lib/prisma-tenant';
+import { upsertUserByCompanyEmail } from '../src/utils/user-repository';
 import {
   authHeader,
   bootstrapQuery,
@@ -355,16 +359,22 @@ describe('Final requirement — creator cannot approve or reject', () => {
 
 describe('Final requirement — approval delegation', () => {
   let managerToken = '';
-  let adminToken = '';
-  let adminId = '';
+  let secondManagerId = '';
 
   beforeAll(async () => {
     managerToken = await getTokenForRole('MANAGER');
-    adminToken = await getTokenForRole('ADMIN');
-    const adminLogin = await request(app)
-      .post('/api/auth/login')
-      .send({ email: 'demo.admin@example.com', password: 'DemoAdmin@123' });
-    adminId = adminLogin.body.user.id as string;
+    secondManagerId = await bootstrapQuery(async () => {
+      const passwordHash = await bcrypt.hash('TestManager@123', 12);
+      const user = await upsertUserByCompanyEmail({
+        companyId: LEGACY_COMPANY_ID,
+        email: uniqueEmail('final-req-manager-2'),
+        name: 'Final Req Second Manager',
+        passwordHash,
+        role: Role.MANAGER,
+        isActive: true,
+      });
+      return user.id;
+    });
   });
 
   afterEach(async () => {
@@ -380,13 +390,13 @@ describe('Final requirement — approval delegation', () => {
       .post('/api/delegations')
       .set(authHeader(managerToken))
       .send({
-        delegatedManagerId: adminId,
+        delegatedManagerId: secondManagerId,
         effectiveFrom: iso('2030-01-01T00:00:00Z'),
         effectiveUntil: iso('2030-01-31T23:59:59Z'),
       });
 
     expect(response.status).toBe(201);
-    expect(response.body.data.delegatedManager.id).toBe(adminId);
+    expect(response.body.data.delegatedManager.id).toBe(secondManagerId);
   });
 
   it('rejects self-delegation', async () => {
@@ -411,7 +421,7 @@ describe('Final requirement — approval delegation', () => {
       .post('/api/delegations')
       .set(authHeader(managerToken))
       .send({
-        delegatedManagerId: adminId,
+        delegatedManagerId: secondManagerId,
         effectiveFrom: iso('2030-02-01T00:00:00Z'),
         effectiveUntil: iso('2030-01-01T00:00:00Z'),
       });

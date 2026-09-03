@@ -5,6 +5,7 @@ import {
   employeeRouter,
   myAccessRouter,
 } from './routes/access-request.routes';
+import companyRoutes from './routes/company.routes';
 import delegationRoutes from './routes/delegation.routes';
 import areaRoutes from './routes/area.routes';
 import assetRoutes from './routes/asset.routes';
@@ -25,6 +26,7 @@ app.use('/api/assets', assetRoutes);
 app.use('/api/access-requests', accessRequestRouter);
 app.use('/api/my-access', myAccessRouter);
 app.use('/api/employees', employeeRouter);
+app.use('/api/company', companyRoutes);
 app.use('/api/delegations', delegationRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);

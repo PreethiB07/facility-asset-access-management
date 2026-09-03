@@ -7,7 +7,9 @@ const NAV_LINKS = [
   { to: '/facilities', label: 'Facilities', roles: 'all' as const },
   { to: '/access-requests', label: 'My Requests', roles: 'all' as const },
   { to: '/my-access', label: 'My Access', roles: 'all' as const },
+  { to: '/company', label: 'Company Details', roles: 'all' as const },
   { to: '/manager/requests', label: 'Pending Approvals', roles: 'manager' as const },
+  { to: '/manager/delegation', label: 'Approval Delegation', roles: 'strictManager' as const },
   { to: '/admin', label: 'Administration', roles: 'admin' as const },
 ];
 
@@ -21,12 +23,15 @@ export default function AppLayout() {
     setMobileNavOpen(false);
   }
 
-  function isLinkVisible(roles: 'all' | 'manager' | 'admin') {
+  function isLinkVisible(roles: 'all' | 'manager' | 'strictManager' | 'admin') {
     if (roles === 'all') {
       return true;
     }
     if (roles === 'manager') {
       return isManagerOrAdmin;
+    }
+    if (roles === 'strictManager') {
+      return user?.role === 'MANAGER';
     }
     return isAdmin;
   }

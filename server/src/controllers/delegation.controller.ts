@@ -32,8 +32,8 @@ export async function listApprovalDelegationsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const { companyId } = getCompanyContextFromRequest(req);
-    const delegations = await listApprovalDelegations(companyId);
+    const { companyId, userId } = getCompanyContextFromRequest(req);
+    const delegations = await listApprovalDelegations(companyId, userId);
     sendList(res, delegations);
   } catch (error) {
     next(error);

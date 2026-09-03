@@ -131,6 +131,30 @@ export interface EmployeeSummary {
   role: Role;
 }
 
+export interface CompanyDetails {
+  id: string;
+  name: string;
+  status: 'ACTIVE';
+  createdAt: string;
+  totalUsers: number;
+  totalFacilities: number;
+}
+
+export interface ApprovalDelegation {
+  id: string;
+  delegatingManager: UserBrief;
+  delegatedManager: UserBrief;
+  effectiveFrom: string;
+  effectiveUntil: string;
+  createdAt: string;
+}
+
+export interface CreateDelegationPayload {
+  delegatedManagerId: string;
+  effectiveFrom: string;
+  effectiveUntil: string;
+}
+
 export interface CreateAccessRequestPayload {
   facilityId?: string;
   areaId?: string;

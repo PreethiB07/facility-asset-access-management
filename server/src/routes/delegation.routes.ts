@@ -7,9 +7,7 @@ import {
 import { authenticate, requireRole } from '../middleware/authenticate.middleware';
 
 const delegationRouter = Router();
-const managerRoles = requireRole(Role.MANAGER, Role.ADMIN);
-
-delegationRouter.use(authenticate, managerRoles);
+delegationRouter.use(authenticate, requireRole(Role.MANAGER));
 delegationRouter.get('/', listApprovalDelegationsHandler);
 delegationRouter.post('/', createApprovalDelegationHandler);
 

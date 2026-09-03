@@ -5,7 +5,9 @@ import AccessRequestsPage from './pages/AccessRequestsPage';
 import AdminPage from './pages/AdminPage';
 import AreaDetailPage from './pages/AreaDetailPage';
 import AssetDetailPage from './pages/AssetDetailPage';
+import CompanyDetailsPage from './pages/CompanyDetailsPage';
 import DashboardPage from './pages/DashboardPage';
+import DelegationPage from './pages/DelegationPage';
 import FacilitiesPage from './pages/FacilitiesPage';
 import FacilityDetailPage from './pages/FacilityDetailPage';
 import LoginPage from './pages/LoginPage';
@@ -15,6 +17,7 @@ import RegisterPage from './pages/RegisterPage';
 import AdminRoute from './routes/AdminRoute';
 import ManagerRoute from './routes/ManagerRoute';
 import ProtectedRoute from './routes/ProtectedRoute';
+import StrictManagerRoute from './routes/StrictManagerRoute';
 
 function App() {
   return (
@@ -32,9 +35,14 @@ function App() {
           <Route path="/access-requests" element={<AccessRequestsPage />} />
           <Route path="/access-requests/:id" element={<AccessRequestDetailPage />} />
           <Route path="/my-access" element={<MyAccessPage />} />
+          <Route path="/company" element={<CompanyDetailsPage />} />
 
           <Route element={<ManagerRoute />}>
             <Route path="/manager/requests" element={<ManagerRequestsPage />} />
+          </Route>
+
+          <Route element={<StrictManagerRoute />}>
+            <Route path="/manager/delegation" element={<DelegationPage />} />
           </Route>
 
           <Route element={<AdminRoute />}>

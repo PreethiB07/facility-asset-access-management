@@ -33,7 +33,7 @@ function toDelegationResponse(
 }
 
 function assertManagerRole(role: Role, message: string): void {
-  if (role !== Role.MANAGER && role !== Role.ADMIN) {
+  if (role !== Role.MANAGER) {
     throw new AppError(403, ErrorCodes.FORBIDDEN, message);
   }
 }
@@ -76,11 +76,11 @@ export async function createApprovalDelegation(
       throw new AppError(400, ErrorCodes.VALIDATION_ERROR, 'Delegated manager is inactive');
     }
 
-    if (delegate.role !== Role.MANAGER && delegate.role !== Role.ADMIN) {
+    if (delegate.role !== Role.MANAGER) {
       throw new AppError(
         400,
         ErrorCodes.VALIDATION_ERROR,
-        'Delegation target must be a manager or admin',
+        'Delegation target must be a manager',
       );
     }
 
@@ -101,10 +101,11 @@ export async function createApprovalDelegation(
 
 export async function listApprovalDelegations(
   companyId: string,
+  delegatingManagerId: string,
 ): Promise<ApprovalDelegationResponse[]> {
   return runWithCompanyContext(companyId, async () => {
     const delegations = await getDb().approvalDelegation.findMany({
-      where: { companyId },
+      where: { companyId, delegatingManagerId },
       include: delegationInclude,
       orderBy: { effectiveFrom: 'desc' },
     });
