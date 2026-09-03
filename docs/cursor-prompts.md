@@ -301,3 +301,48 @@ Commit as: `feat: polish ux and add admin management`
 ### Rejected suggestions
 
 - Adding a toast library (e.g. react-hot-toast) — rejected; lightweight custom solution sufficient.
+
+---
+
+## Stage 9 — Final QA, Security Review, Bug Fixing & Submission Preparation
+
+### Prompt
+
+Final QA: requirement audit, database/migration review, authentication/authorization/IDOR/validation review, business rule verification, frontend UX/accessibility/responsive review, test coverage review, documentation (README, requirement checklist, known issues), git review, submission preparation.
+
+Commit as: `chore: complete final qa and submission review`
+
+### What was reviewed
+
+- Prisma schema relationships, FK behavior, indexes, XOR access-request targets
+- JWT/bcrypt security, inactive user handling, role authorization on all privileged APIs
+- Access request state machine, expiration, inactive resources, concurrency (409)
+- Frontend password toggles, loading/error/empty states, admin/manager flows
+- 123 backend + 36 frontend automated tests (all passing)
+- `.gitignore` for env files; `.env.example` placeholders only
+
+### What was generated
+
+- `docs/requirement-checklist.md` — honest PASS/PARTIAL/NOT IMPLEMENTED audit
+- `docs/known-issues.md` — documented non-critical limitations
+- README finalization (architecture, roles, workflows, how to run, documentation index)
+- `.gitignore` update for `.env.production`
+
+### Review notes
+
+- No critical defects found during QA; no application code changes required
+- Manual browser E2E recommended before demo; not automated in repo
+- Server `console.error` retained for unexpected errors only (not exposed to clients)
+- Seed/dev `console.log` in `seed.ts` and startup message in `index.ts` are intentional
+
+### Important design decisions (confirmed at QA)
+
+- **Inactive resource + approved access:** Historical requests preserved; current access excluded when target deactivated
+- **Ownership privacy:** Other users' request IDs return 404, not 403
+- **Auto-approve:** `approvedById = null` for system/auto approval
+- **Timestamps:** Stored as UTC `DateTime`; API returns ISO strings; frontend displays local timezone
+
+### Rejected at QA
+
+- Large refactors or new features — rejected; focus on correctness and documentation
+- `prisma migrate reset` on shared databases — not run; deploy flow documented instead

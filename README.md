@@ -1,6 +1,70 @@
 # Facility & Asset Access Management
 
-A SaaS platform for managing facility and asset access requests, approvals, and permissions.
+A full-stack platform for managing facilities, areas, and assets, and controlling who can request and receive access through a structured approval workflow.
+
+## Features
+
+- **Resource hierarchy:** Facilities → Areas → Assets, plus independent facility-level assets
+- **Access requests:** Request access to a facility, area, or asset (temporary or permanent)
+- **Automatic or manual approval:** Based on `requiresApproval` on each resource
+- **Manager workflow:** Pending queue, approve/reject with reason and conflict protection
+- **Current access:** View only valid, active approved access for the logged-in user
+- **Admin management:** Create/edit/activate/deactivate facilities, areas, and assets
+- **Role-based access:** USER, MANAGER, ADMIN with server-side authorization
+- **React frontend:** Auth, dashboards, browsing, requests, manager and admin UIs
+
+## Architecture
+
+```
+Browser (React/Vite :5173)
+        │  REST + JWT Bearer
+        ▼
+Express API (:3001)
+        │
+        ▼
+PostgreSQL (Prisma ORM)
+```
+
+Monorepo layout:
+
+- `client/` — React + TypeScript frontend
+- `server/` — Express + TypeScript backend
+- `docs/` — Design docs, workflow, QA artifacts
+
+See [docs/database-design.md](docs/database-design.md), [docs/access-request-workflow.md](docs/access-request-workflow.md), [docs/requirement-checklist.md](docs/requirement-checklist.md), and [docs/known-issues.md](docs/known-issues.md).
+
+## User Roles
+
+| Role | Capabilities |
+|------|--------------|
+| **USER** | Register, browse active resources, submit/view own requests, view own current access |
+| **MANAGER** | USER capabilities + view pending requests, approve/reject |
+| **ADMIN** | MANAGER capabilities + create/update/deactivate facilities, areas, assets |
+
+Registration always assigns **USER**. MANAGER/ADMIN accounts come from seed data or database administration.
+
+## Access Request Workflow
+
+1. User selects a facility, area, or asset and submits a request (type, dates, reason).
+2. If `requiresApproval = false`, the request is **APPROVED** immediately.
+3. If `requiresApproval = true`, status is **PENDING** until a manager/admin acts.
+4. Manager approves → **APPROVED** (or rejects with reason → **REJECTED**).
+5. Approved access appears in **My Access** when currently valid (started, not expired, target still active).
+
+## Approval Workflow
+
+- Only **PENDING** requests can be approved or rejected.
+- Approve validates target is still active and temporary period has not expired.
+- Reject requires a non-empty `rejectionReason`.
+- Concurrent manager actions: first succeeds; second receives **409 Conflict**.
+- See [docs/access-request-workflow.md](docs/access-request-workflow.md) for details.
+
+## Known Limitations
+
+- No admin UI for user/role management (see [docs/known-issues.md](docs/known-issues.md))
+- No password reset or email verification
+- JWT stored in `localStorage` (standard SPA pattern; use HTTPS in production)
+- Browser E2E tests not automated; API + component tests cover business logic
 
 ## Purpose
 
@@ -42,6 +106,8 @@ facility-asset-access-management/
     ├── cursor-prompts.md
     └── database-design.md
     └── access-request-workflow.md
+    └── requirement-checklist.md
+    └── known-issues.md
 ```
 
 ## Prerequisites
@@ -97,9 +163,41 @@ cd client && npm install
 
 ```bash
 cd server
-npm run db:migrate
-npm run db:seed
+npm run db:migrate      # development: create/apply migrations
+npm run db:seed         # optional: seed demo data
 ```
+
+For production or CI deployment of migrations (does not seed):
+
+```bash
+cd server
+npm run db:migrate:deploy
+```
+
+Prisma schema validates with `npm run db:validate`. A single initial migration exists: `20260903053611_init`.
+
+## How to Run (Full Application)
+
+```bash
+# 1. Configure environment
+cp server/.env.example server/.env
+# Edit DATABASE_URL, JWT_SECRET, SEED_*_PASSWORD
+
+# 2. Install and migrate
+cd server && npm install && npm run db:migrate && npm run db:seed
+
+# 3. Start backend (terminal 1)
+cd server && npm run dev
+
+# 4. Install and start frontend (terminal 2)
+cd client && npm install && npm run dev
+```
+
+Open `http://localhost:5173`. Seed users (passwords from your `SEED_*_PASSWORD` values):
+
+- `admin@example.com` — ADMIN
+- `manager@example.com` — MANAGER
+- `user@example.com` — USER
 
 ## Start the Backend
 
@@ -215,10 +313,26 @@ cd server && npm test
 # Frontend (36 tests)
 cd client && npm test
 
+# Type checking
+cd server && npm run typecheck
+cd client && npm run typecheck
+
 # Production builds
 cd server && npm run build
 cd client && npm run build
 ```
+
+No dedicated ESLint script is configured; TypeScript strict mode is enabled in both packages.
+
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [docs/requirement-checklist.md](docs/requirement-checklist.md) | Final QA requirement audit |
+| [docs/known-issues.md](docs/known-issues.md) | Known limitations |
+| [docs/cursor-prompts.md](docs/cursor-prompts.md) | Incremental development prompts |
+| [docs/database-design.md](docs/database-design.md) | Schema and relationships |
+| [docs/access-request-workflow.md](docs/access-request-workflow.md) | Access/approval rules |
 
 ## Authentication
 
@@ -237,7 +351,7 @@ Authentication uses **JWT bearer tokens** and **bcrypt** password hashing.
 |------|-------------|
 | `USER` | Standard user; default for registration |
 | `MANAGER` | Can approve/reject pending access requests |
-| `ADMIN` | Full administrative access (API); admin UI in Stage 8 |
+| `ADMIN` | Full administrative access; resource CRUD via API and `/admin` UI |
 
 Registration always creates `USER` accounts. Privileged roles are assigned via seed data or future admin tooling — not through public registration.
 
@@ -373,7 +487,7 @@ Response:
 6. ~~Manager approval and rejection workflow~~
 7. ~~React frontend — authentication, facilities, access requests, manager dashboard~~
 8. ~~Admin management UI + application polish + final testing/review~~
-9. Final QA, security review, bug fixing and challenge submission preparation
+9. ~~Final QA, security review, bug fixing and challenge submission preparation~~
 
 ## Scripts
 
@@ -383,7 +497,9 @@ Response:
 | `server/` | `npm run build` | Compile TypeScript |
 | `server/` | `npm run typecheck` | Type-check without emitting |
 | `server/` | `npm test` | Run backend API tests |
-| `server/` | `npm run db:migrate` | Run Prisma migrations |
+| `server/` | `npm run db:migrate` | Run Prisma migrations (development) |
+| `server/` | `npm run db:migrate:deploy` | Apply migrations (production/CI) |
+| `server/` | `npm run db:validate` | Validate Prisma schema |
 | `server/` | `npm run db:seed` | Seed development data |
 | `client/` | `npm run dev` | Start Vite dev server |
 | `client/` | `npm run build` | Type-check and production build |
