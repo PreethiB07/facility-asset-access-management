@@ -13,9 +13,12 @@ import {
   type FacilitySummary,
 } from '../types/resource.types';
 
-export async function listFacilities(filter: ActiveFilter): Promise<FacilitySummary[]> {
+export async function listFacilities(
+  filter: ActiveFilter,
+  companyId: string,
+): Promise<FacilitySummary[]> {
   const facilities = await prisma.facility.findMany({
-    where: filter,
+    where: { ...filter, companyId },
     orderBy: { name: 'asc' },
   });
 
@@ -25,12 +28,13 @@ export async function listFacilities(filter: ActiveFilter): Promise<FacilitySumm
 export async function getFacilityById(
   id: string,
   filter: ActiveFilter,
+  companyId: string,
 ): Promise<FacilityDetail> {
   const facility = await prisma.facility.findFirst({
-    where: { id, ...filter },
+    where: { id, companyId, ...filter },
     include: {
       areas: {
-        where: filter,
+        where: { companyId, ...filter },
         orderBy: { name: 'asc' },
       },
     },
@@ -63,8 +67,9 @@ export async function createFacility(
 export async function updateFacility(
   id: string,
   input: UpdateFacilityInput,
+  companyId: string,
 ): Promise<FacilitySummary> {
-  const existing = await prisma.facility.findUnique({ where: { id } });
+  const existing = await prisma.facility.findFirst({ where: { id, companyId } });
 
   if (!existing) {
     throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
@@ -78,8 +83,8 @@ export async function updateFacility(
   return toFacilitySummary(facility);
 }
 
-export async function assertFacilityExists(id: string): Promise<void> {
-  const facility = await prisma.facility.findUnique({ where: { id } });
+export async function assertFacilityInCompany(id: string, companyId: string): Promise<void> {
+  const facility = await prisma.facility.findFirst({ where: { id, companyId } });
   if (!facility) {
     throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
   }

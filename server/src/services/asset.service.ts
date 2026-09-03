@@ -5,23 +5,24 @@ import type { ActiveFilter } from '../utils/query.util';
 import type { AssetSummary } from '../types/resource.types';
 import { toAssetSummary } from '../types/resource.types';
 import type { CreateAssetInput, UpdateAssetInput } from '../validators/resource.validators';
-import { assertAreaBelongsToFacility, assertAreaExists } from './area.service';
-import { assertFacilityExists } from './facility.service';
+import { assertAreaBelongsToFacility, assertAreaInCompany } from './area.service';
+import { assertFacilityInCompany } from './facility.service';
 
 async function validateAssetRelationships(
   facilityId: string,
   areaId: string | null | undefined,
+  companyId: string,
 ): Promise<void> {
-  await assertFacilityExists(facilityId);
+  await assertFacilityInCompany(facilityId, companyId);
 
   if (areaId) {
-    await assertAreaBelongsToFacility(areaId, facilityId);
+    await assertAreaBelongsToFacility(areaId, facilityId, companyId);
   }
 }
 
-export async function listAssets(filter: ActiveFilter): Promise<AssetSummary[]> {
+export async function listAssets(filter: ActiveFilter, companyId: string): Promise<AssetSummary[]> {
   const assets = await prisma.asset.findMany({
-    where: filter,
+    where: { ...filter, companyId },
     orderBy: { name: 'asc' },
   });
 
@@ -31,20 +32,25 @@ export async function listAssets(filter: ActiveFilter): Promise<AssetSummary[]> 
 export async function listAssetsByArea(
   areaId: string,
   filter: ActiveFilter,
+  companyId: string,
 ): Promise<AssetSummary[]> {
-  await assertAreaExists(areaId);
+  await assertAreaInCompany(areaId, companyId);
 
   const assets = await prisma.asset.findMany({
-    where: { areaId, ...filter },
+    where: { areaId, companyId, ...filter },
     orderBy: { name: 'asc' },
   });
 
   return assets.map(toAssetSummary);
 }
 
-export async function getAssetById(id: string, filter: ActiveFilter): Promise<AssetSummary> {
+export async function getAssetById(
+  id: string,
+  filter: ActiveFilter,
+  companyId: string,
+): Promise<AssetSummary> {
   const asset = await prisma.asset.findFirst({
-    where: { id, ...filter },
+    where: { id, companyId, ...filter },
   });
 
   if (!asset) {
@@ -54,18 +60,16 @@ export async function getAssetById(id: string, filter: ActiveFilter): Promise<As
   return toAssetSummary(asset);
 }
 
-export async function createAsset(input: CreateAssetInput): Promise<AssetSummary> {
+export async function createAsset(
+  input: CreateAssetInput,
+  companyId: string,
+): Promise<AssetSummary> {
   const areaId = input.areaId ?? null;
-  await validateAssetRelationships(input.facilityId, areaId);
-
-  const facility = await prisma.facility.findUnique({ where: { id: input.facilityId } });
-  if (!facility) {
-    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
-  }
+  await validateAssetRelationships(input.facilityId, areaId, companyId);
 
   const asset = await prisma.asset.create({
     data: {
-      companyId: facility.companyId,
+      companyId,
       facilityId: input.facilityId,
       areaId,
       name: input.name,
@@ -78,18 +82,21 @@ export async function createAsset(input: CreateAssetInput): Promise<AssetSummary
   return toAssetSummary(asset);
 }
 
-export async function updateAsset(id: string, input: UpdateAssetInput): Promise<AssetSummary> {
-  const existing = await prisma.asset.findUnique({ where: { id } });
+export async function updateAsset(
+  id: string,
+  input: UpdateAssetInput,
+  companyId: string,
+): Promise<AssetSummary> {
+  const existing = await prisma.asset.findFirst({ where: { id, companyId } });
 
   if (!existing) {
     throw new AppError(404, ErrorCodes.NOT_FOUND, 'Asset not found');
   }
 
   const facilityId = input.facilityId ?? existing.facilityId;
-  const areaId =
-    input.areaId !== undefined ? input.areaId : existing.areaId;
+  const areaId = input.areaId !== undefined ? input.areaId : existing.areaId;
 
-  await validateAssetRelationships(facilityId, areaId);
+  await validateAssetRelationships(facilityId, areaId, companyId);
 
   const asset = await prisma.asset.update({
     where: { id },

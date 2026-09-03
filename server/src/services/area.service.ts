@@ -5,25 +5,30 @@ import type { ActiveFilter } from '../utils/query.util';
 import type { AreaDetail, AreaSummary } from '../types/resource.types';
 import { toAreaDetail, toAreaSummary } from '../types/resource.types';
 import type { CreateAreaInput, UpdateAreaInput } from '../validators/resource.validators';
-import { assertFacilityExists } from './facility.service';
+import { assertFacilityInCompany } from './facility.service';
 
 export async function listAreasByFacility(
   facilityId: string,
   filter: ActiveFilter,
+  companyId: string,
 ): Promise<AreaSummary[]> {
-  await assertFacilityExists(facilityId);
+  await assertFacilityInCompany(facilityId, companyId);
 
   const areas = await prisma.area.findMany({
-    where: { facilityId, ...filter },
+    where: { facilityId, companyId, ...filter },
     orderBy: { name: 'asc' },
   });
 
   return areas.map(toAreaSummary);
 }
 
-export async function getAreaById(id: string, filter: ActiveFilter): Promise<AreaDetail> {
+export async function getAreaById(
+  id: string,
+  filter: ActiveFilter,
+  companyId: string,
+): Promise<AreaDetail> {
   const area = await prisma.area.findFirst({
-    where: { id, ...filter },
+    where: { id, companyId, ...filter },
   });
 
   if (!area) {
@@ -36,26 +41,27 @@ export async function getAreaById(id: string, filter: ActiveFilter): Promise<Are
 export async function createArea(
   facilityId: string,
   input: CreateAreaInput,
+  companyId: string,
 ): Promise<AreaDetail> {
-  const facility = await prisma.facility.findUnique({ where: { id: facilityId } });
-
-  if (!facility) {
-    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
-  }
+  await assertFacilityInCompany(facilityId, companyId);
 
   const area = await prisma.area.create({
     data: {
       ...input,
       facilityId,
-      companyId: facility.companyId,
+      companyId,
     },
   });
 
   return toAreaDetail(area);
 }
 
-export async function updateArea(id: string, input: UpdateAreaInput): Promise<AreaDetail> {
-  const existing = await prisma.area.findUnique({ where: { id } });
+export async function updateArea(
+  id: string,
+  input: UpdateAreaInput,
+  companyId: string,
+): Promise<AreaDetail> {
+  const existing = await prisma.area.findFirst({ where: { id, companyId } });
 
   if (!existing) {
     throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
@@ -72,8 +78,9 @@ export async function updateArea(id: string, input: UpdateAreaInput): Promise<Ar
 export async function assertAreaBelongsToFacility(
   areaId: string,
   facilityId: string,
+  companyId: string,
 ): Promise<void> {
-  const area = await prisma.area.findUnique({ where: { id: areaId } });
+  const area = await prisma.area.findFirst({ where: { id: areaId, companyId } });
 
   if (!area) {
     throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
@@ -88,8 +95,8 @@ export async function assertAreaBelongsToFacility(
   }
 }
 
-export async function assertAreaExists(areaId: string): Promise<void> {
-  const area = await prisma.area.findUnique({ where: { id: areaId } });
+export async function assertAreaInCompany(areaId: string, companyId: string): Promise<void> {
+  const area = await prisma.area.findFirst({ where: { id: areaId, companyId } });
   if (!area) {
     throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
   }

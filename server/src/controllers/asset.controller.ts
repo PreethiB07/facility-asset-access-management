@@ -10,6 +10,7 @@ import {
 import { getRouteParam, isUuid, resolveActiveFilter } from '../utils/query.util';
 import { parseBody, sendData, sendList } from '../utils/response.util';
 import { createAssetSchema, updateAssetSchema } from '../validators/resource.validators';
+import { getCompanyContextFromRequest } from '../utils/company-context';
 
 function parseIdParam(id: string, label: string): string {
   if (!isUuid(id)) {
@@ -31,7 +32,8 @@ export async function listAssetsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const assets = await listAssets(getActiveFilter(req));
+    const { companyId } = getCompanyContextFromRequest(req);
+    const assets = await listAssets(getActiveFilter(req), companyId);
     sendList(res, assets);
   } catch (error) {
     next(error);
@@ -44,8 +46,9 @@ export async function getAssetHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const { companyId } = getCompanyContextFromRequest(req);
     const id = parseIdParam(getRouteParam(req.params.id), 'asset id');
-    const asset = await getAssetById(id, getActiveFilter(req));
+    const asset = await getAssetById(id, getActiveFilter(req), companyId);
     sendData(res, asset);
   } catch (error) {
     next(error);
@@ -58,8 +61,9 @@ export async function createAssetHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const { companyId } = getCompanyContextFromRequest(req);
     const input = parseBody(createAssetSchema, req.body);
-    const asset = await createAsset(input);
+    const asset = await createAsset(input, companyId);
     sendData(res, asset, 201);
   } catch (error) {
     next(error);
@@ -72,9 +76,10 @@ export async function updateAssetHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const { companyId } = getCompanyContextFromRequest(req);
     const id = parseIdParam(getRouteParam(req.params.id), 'asset id');
     const input = parseBody(updateAssetSchema, req.body);
-    const asset = await updateAsset(id, input);
+    const asset = await updateAsset(id, input, companyId);
     sendData(res, asset);
   } catch (error) {
     next(error);

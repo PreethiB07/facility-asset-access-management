@@ -35,7 +35,8 @@ export async function listFacilitiesHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const facilities = await listFacilities(getActiveFilter(req));
+    const { companyId } = getCompanyContextFromRequest(req);
+    const facilities = await listFacilities(getActiveFilter(req), companyId);
     sendList(res, facilities);
   } catch (error) {
     next(error);
@@ -48,8 +49,9 @@ export async function getFacilityHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const { companyId } = getCompanyContextFromRequest(req);
     const id = parseIdParam(getRouteParam(req.params.id), 'facility id');
-    const facility = await getFacilityById(id, getActiveFilter(req));
+    const facility = await getFacilityById(id, getActiveFilter(req), companyId);
     sendData(res, facility);
   } catch (error) {
     next(error);
@@ -77,9 +79,10 @@ export async function updateFacilityHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const { companyId } = getCompanyContextFromRequest(req);
     const id = parseIdParam(getRouteParam(req.params.id), 'facility id');
     const input = parseBody(updateFacilitySchema, req.body);
-    const facility = await updateFacility(id, input);
+    const facility = await updateFacility(id, input, companyId);
     sendData(res, facility);
   } catch (error) {
     next(error);

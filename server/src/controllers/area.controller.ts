@@ -11,6 +11,7 @@ import { listAssetsByArea } from '../services/asset.service';
 import { getRouteParam, isUuid, resolveActiveFilter } from '../utils/query.util';
 import { parseBody, sendData, sendList } from '../utils/response.util';
 import { createAreaSchema, updateAreaSchema } from '../validators/resource.validators';
+import { getCompanyContextFromRequest } from '../utils/company-context';
 
 function parseIdParam(id: string, label: string): string {
   if (!isUuid(id)) {
@@ -32,8 +33,9 @@ export async function listFacilityAreasHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const { companyId } = getCompanyContextFromRequest(req);
     const facilityId = parseIdParam(getRouteParam(req.params.facilityId), 'facility id');
-    const areas = await listAreasByFacility(facilityId, getActiveFilter(req));
+    const areas = await listAreasByFacility(facilityId, getActiveFilter(req), companyId);
     sendList(res, areas);
   } catch (error) {
     next(error);
@@ -46,8 +48,9 @@ export async function getAreaHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const { companyId } = getCompanyContextFromRequest(req);
     const id = parseIdParam(getRouteParam(req.params.id), 'area id');
-    const area = await getAreaById(id, getActiveFilter(req));
+    const area = await getAreaById(id, getActiveFilter(req), companyId);
     sendData(res, area);
   } catch (error) {
     next(error);
@@ -60,9 +63,10 @@ export async function createAreaHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const { companyId } = getCompanyContextFromRequest(req);
     const facilityId = parseIdParam(getRouteParam(req.params.facilityId), 'facility id');
     const input = parseBody(createAreaSchema, req.body);
-    const area = await createArea(facilityId, input);
+    const area = await createArea(facilityId, input, companyId);
     sendData(res, area, 201);
   } catch (error) {
     next(error);
@@ -75,9 +79,10 @@ export async function updateAreaHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const { companyId } = getCompanyContextFromRequest(req);
     const id = parseIdParam(getRouteParam(req.params.id), 'area id');
     const input = parseBody(updateAreaSchema, req.body);
-    const area = await updateArea(id, input);
+    const area = await updateArea(id, input, companyId);
     sendData(res, area);
   } catch (error) {
     next(error);
@@ -90,8 +95,9 @@ export async function listAreaAssetsHandler(
   next: NextFunction,
 ): Promise<void> {
   try {
+    const { companyId } = getCompanyContextFromRequest(req);
     const areaId = parseIdParam(getRouteParam(req.params.areaId), 'area id');
-    const assets = await listAssetsByArea(areaId, getActiveFilter(req));
+    const assets = await listAssetsByArea(areaId, getActiveFilter(req), companyId);
     sendList(res, assets);
   } catch (error) {
     next(error);
