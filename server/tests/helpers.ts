@@ -39,7 +39,7 @@ export function authHeader(token: string): { Authorization: string } {
   return { Authorization: `Bearer ${token}` };
 }
 
-import { DEMO_CREDENTIALS } from './demo-users';
+import { DEMO_CREDENTIALS, GLOBEX_CREDENTIALS } from './demo-users';
 
 export async function getTokenForRole(
   role: 'USER' | 'MANAGER' | 'ADMIN',
@@ -49,6 +49,19 @@ export async function getTokenForRole(
   const response = await loginUser({ email, password });
   if (response.status !== 200) {
     throw new Error(`Failed to login as ${role}`);
+  }
+
+  return response.body.token as string;
+}
+
+export async function getGlobexTokenForRole(
+  role: 'USER' | 'MANAGER' | 'ADMIN',
+): Promise<string> {
+  const { email, password } = GLOBEX_CREDENTIALS[role];
+
+  const response = await loginUser({ email, password });
+  if (response.status !== 200) {
+    throw new Error(`Failed to login as Globex ${role}`);
   }
 
   return response.body.token as string;

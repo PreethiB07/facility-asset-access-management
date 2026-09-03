@@ -132,40 +132,43 @@ getCompanyContext(req)   // server/src/utils/company-context.ts
 
 ---
 
-## API Impact List (Stage 14+)
+## API Isolation (Stage 14 — Complete)
 
-| Area | Endpoints | Required change |
-|------|-----------|-----------------|
-| Auth | `POST /register`, `POST /login`, `GET /me` | Return `companyId` in user (done); filter N/A |
-| Facilities | `GET/POST/PATCH /facilities`, nested areas | Scope all queries/mutations by `companyId` |
-| Areas | `GET/PATCH /areas/:id`, facility nested routes | Scope by `companyId` |
-| Assets | `GET/POST/PATCH /assets`, area assets | Scope by `companyId` |
-| Access requests | CRUD + approve/reject + my-access | Scope by `companyId`; validate cross-entity |
-| Manager pending | `GET /access-requests/pending` | Only same-company requests |
+All REST endpoints derive `companyId` from the authenticated user via `getCompanyContextFromRequest()`. Cross-company access returns **404** (no existence leak).
 
-Create operations now set `companyId` from the authenticated user or parent resource (minimal Stage 13 support). **Read/list operations are not yet tenant-filtered** — that is the next stage.
+| Area | Endpoints | Status |
+|------|-----------|--------|
+| Auth | `POST /register`, `POST /login`, `GET /me` | `companyId` returned; register assigns default company |
+| Facilities | `GET/POST/PATCH /facilities`, nested areas | Scoped by `companyId` |
+| Areas | `GET/PATCH /areas/:id`, facility nested routes | Scoped by `companyId` |
+| Assets | `GET/POST/PATCH /assets`, area assets | Scoped by `companyId` |
+| Access requests | CRUD + approve/reject + my-access | Scoped by `companyId`; target validated on create |
+| Manager pending | `GET /access-requests/pending` | Same-company only |
+
+Client-supplied `companyId` in request bodies is ignored (Zod strips unknown fields); authorization always uses server-derived context.
 
 ---
 
-## Test Impact Analysis
+## Test Coverage (Stage 14)
 
-| Test file | Current assumption | Stage 14 needs |
-|-----------|-------------------|----------------|
-| `auth.test.ts` | Single tenant; demo Acme users | Add `companyId` assertions on `/me` |
-| `resources.test.ts` | Global facility list | Company-scoped creates/lists |
-| `access-requests.test.ts` | Shared seed data | Tenant-scoped request visibility |
-| `access-request-manager.test.ts` | Manager sees all pending | Manager sees only same-company pending |
+| Test file | Coverage |
+|-----------|----------|
+| `company-isolation.test.ts` | Cross-company 404s, manager/admin isolation, tampering |
+| `auth.test.ts`, `resources.test.ts`, etc. | Regression — all pass with company-scoped queries |
 
-### Planned isolation tests (Stage 14+)
+### Isolation tests implemented
 
-- Company A user cannot read Company B facility by ID (404).
+- Company A user cannot read Company B facility/area/asset/request by ID (404).
 - Company A user cannot create access request for Company B resource.
-- Company A manager cannot approve Company B pending request.
-- Company B admin cannot mutate Company A facilities.
+- Company A manager cannot approve/reject Company B pending request.
+- Company A admin cannot mutate or list Company B resources.
+- Tampering with `companyId` in body does not assign records to another company.
 
-Existing tests are **retained**; demo users remain on Acme Corporation via `tests/demo-users.ts`.
+Demo users: Acme via `DEMO_CREDENTIALS`, Globex via `GLOBEX_CREDENTIALS` in `tests/demo-users.ts`.
 
 ---
+
+## API Impact List (Historical — Stage 14)
 
 ## Seed Data (Development)
 

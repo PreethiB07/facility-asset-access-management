@@ -3,6 +3,7 @@ import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import {
   ACME_CORPORATION_NAME,
+  GLOBEX_COMPANY_ID,
   GLOBEX_INDUSTRIES_NAME,
   LEGACY_COMPANY_ID,
 } from '../src/constants/company.constants';
@@ -14,8 +15,6 @@ dotenv.config();
 const prisma = new PrismaClient();
 
 const SALT_ROUNDS = 12;
-
-const GLOBEX_COMPANY_ID = '00000000-0000-4000-8000-000000000002';
 
 interface DemoAccount {
   email: string;

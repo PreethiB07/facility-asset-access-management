@@ -391,3 +391,23 @@ Commit as: `feat: add multi-company data model`
 ### Next stage
 
 Update REST APIs and authorization for company isolation (tenant-scoped queries).
+
+---
+
+## Stage 14 — Company Isolation in REST APIs & Authorization
+
+### Prompt
+
+Enforce company isolation on all REST endpoints. Cross-company access returns 404. Add cross-company tests with Acme and Globex demo users.
+
+### What was implemented
+
+- All facility/area/asset list/get/update scoped by `companyId`
+- Access request create validates target resource company; list/pending/approve/reject scoped
+- Controllers pass `getCompanyContextFromRequest()` to all service calls
+- `GLOBEX_COMPANY_ID` constant; Globex demo users in test setup
+- `tests/company-isolation.test.ts` — 26 cross-company tests
+
+### Next stage
+
+Implement PostgreSQL Row-Level Security.
