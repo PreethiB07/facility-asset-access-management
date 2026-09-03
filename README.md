@@ -217,6 +217,9 @@ All access request endpoints require JWT authentication. See [docs/access-reques
 | GET | `/api/access-requests` | List own requests (`?status=PENDING\|APPROVED\|REJECTED`) |
 | GET | `/api/access-requests/:id` | View own request details |
 | GET | `/api/my-access` | Currently valid approved access |
+| GET | `/api/access-requests/pending` | List pending requests (Manager/Admin) |
+| PATCH | `/api/access-requests/:id/approve` | Approve request (Manager/Admin) |
+| PATCH | `/api/access-requests/:id/reject` | Reject request (Manager/Admin) |
 
 ### Key Rules
 
@@ -225,6 +228,8 @@ All access request endpoints require JWT authentication. See [docs/access-reques
 - Auto-approve when `requiresApproval = false`; otherwise `PENDING`
 - Temporary access requires `endAt > startAt`; permanent access has no `endAt`
 - Users can only view their own requests
+- Managers/Admins approve or reject pending requests; state machine enforced
+- Approval blocked for inactive targets or expired temporary periods
 
 ## Health Endpoint
 
@@ -247,8 +252,8 @@ Response:
 3. ~~Authentication (JWT + bcrypt)~~
 4. ~~Facilities, areas, and assets REST APIs~~
 5. ~~Access request creation workflow~~
-6. Manager approval and rejection workflow
-7. Automated API and business-logic tests
+6. ~~Manager approval and rejection workflow~~
+7. React frontend — authentication, facilities, access requests, manager dashboard
 
 ## Scripts
 

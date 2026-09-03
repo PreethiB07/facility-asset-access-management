@@ -27,8 +27,54 @@ APPROVED   (manager action in next stage)
 | GET | `/api/access-requests` | Yes | List own requests (`?status=` optional) |
 | GET | `/api/access-requests/:id` | Yes | View own request details |
 | GET | `/api/my-access` | Yes | Currently valid approved access |
+| GET | `/api/access-requests/pending` | Manager, Admin | List pending requests |
+| PATCH | `/api/access-requests/:id/approve` | Manager, Admin | Approve pending request |
+| PATCH | `/api/access-requests/:id/reject` | Manager, Admin | Reject pending request |
 
 The requester is always taken from the authenticated JWT user. Clients cannot specify another requester.
+
+## Manager Approval Workflow
+
+### Authorization
+
+| Action | USER | MANAGER | ADMIN |
+|--------|------|---------|-------|
+| View pending requests | No | Yes | Yes |
+| Approve request | No | Yes | Yes |
+| Reject request | No | Yes | Yes |
+
+### State Machine
+
+```text
+PENDING
+   │
+   ├── APPROVED
+   │
+   └── REJECTED
+```
+
+Only `PENDING → APPROVED` and `PENDING → REJECTED` are allowed. Any other transition returns `409 Conflict`.
+
+State transitions are centralized in the service layer and enforced with conditional `updateMany` (`WHERE status = PENDING`).
+
+### Approval
+
+- Re-validates target is still active before approving
+- Rejects approval if temporary access has already expired (`endAt <= now`)
+- Sets `approvedById`, `approvedAt`; clears `rejectionReason`
+
+### Rejection
+
+- Requires non-empty `rejectionReason` (trimmed, max 500 chars)
+- Sets `approvedById`, `approvedAt`, and `rejectionReason`
+
+### Concurrency
+
+Concurrent approve/reject on the same pending request: only the first conditional update succeeds; the second receives `409 Conflict`.
+
+### Inactive target at approval time
+
+If a resource becomes inactive while a request is pending, approval is rejected with `400`. The pending record is preserved for audit. Rejection is still allowed.
 
 ## Target Validation
 
@@ -75,7 +121,7 @@ Uses `requiresApproval` on the **direct target** (facility, area, or asset):
 | `false` | `APPROVED` | Current timestamp | `null` |
 | `true` | `PENDING` | `null` | `null` |
 
-Manager approval/rejection is implemented in the next stage.
+Manager approval/rejection is implemented for pending requests.
 
 ## Current Access (`GET /api/my-access`)
 

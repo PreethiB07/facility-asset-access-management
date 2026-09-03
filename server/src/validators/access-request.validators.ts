@@ -92,3 +92,16 @@ export type CreateAccessRequestBody = z.infer<typeof createAccessRequestSchema>;
 export const accessRequestStatusFilterSchema = z
   .enum(['PENDING', 'APPROVED', 'REJECTED'])
   .optional();
+
+export const rejectAccessRequestSchema = z.object({
+  rejectionReason: z
+    .string()
+    .trim()
+    .min(1, 'Rejection reason is required')
+    .max(500, 'Rejection reason must be at most 500 characters')
+    .refine((value) => value.trim().length > 0, {
+      message: 'Rejection reason cannot be empty or whitespace only',
+    }),
+});
+
+export type RejectAccessRequestBody = z.infer<typeof rejectAccessRequestSchema>;

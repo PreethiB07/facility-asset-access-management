@@ -194,3 +194,33 @@ Commit as: `feat: implement access request workflow`
 
 - Normalizing permanent requests by stripping `endAt` — rejected; explicit rejection preferred.
 - Manager viewing all requests in this stage — deferred to approval workflow stage.
+
+---
+
+## Stage 6 — Manager Approval & Rejection Workflow
+
+### Prompt
+
+Implement manager workflow: `GET /api/access-requests/pending`, `PATCH .../approve`, `PATCH .../reject` for MANAGER/ADMIN; state machine; approver tracking; inactive/expired validation; concurrent state protection; comprehensive tests.
+
+Commit as: `feat: add manager approval workflow`
+
+### What was generated
+
+- Extended `access-request.service.ts` with pending list, approve, reject
+- Manager handlers in `access-request.controller.ts`
+- Routes with `requireRole(MANAGER, ADMIN)` on manager endpoints
+- `rejectAccessRequestSchema` validator
+- `server/tests/access-request-manager.test.ts` — 31 tests
+
+### Important design decisions
+
+- **State machine:** only `PENDING → APPROVED | REJECTED`; invalid transitions return 409
+- **Conditional updateMany:** prevents double-processing concurrent manager actions
+- **Approval re-validation:** inactive targets and expired temporary periods blocked at approval time
+- **Reject still allowed** on inactive targets (manager can deny without granting access)
+- **No schema changes:** existing `approvedById`, `approvedAt`, `rejectionReason` fields reused
+
+### Rejected suggestions
+
+- Distributed locking — rejected; conditional DB update is sufficient for this stage.

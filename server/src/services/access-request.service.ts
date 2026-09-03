@@ -13,8 +13,11 @@ import { prisma } from '../lib/prisma';
 import type {
   AccessRequestResponse,
   AccessTargetInfo,
+  ApproverInfo,
   CreateAccessRequestInput,
   CurrentAccessResponse,
+  ManagerActionResponse,
+  PendingAccessRequestResponse,
 } from '../types/access-request.types';
 
 type AccessRequestWithRelations = AccessRequest & {
@@ -23,10 +26,21 @@ type AccessRequestWithRelations = AccessRequest & {
   asset: (Asset & { facility: Facility; area: Area | null }) | null;
 };
 
+type AccessRequestWithRequester = AccessRequestWithRelations & {
+  requester: { id: string; name: string; email: string };
+  approvedBy: { id: string; name: string } | null;
+};
+
 const accessRequestInclude = {
   facility: true,
   area: { include: { facility: true } },
   asset: { include: { facility: true, area: true } },
+} satisfies Prisma.AccessRequestInclude;
+
+const managerAccessRequestInclude = {
+  ...accessRequestInclude,
+  requester: { select: { id: true, name: true, email: true } },
+  approvedBy: { select: { id: true, name: true } },
 } satisfies Prisma.AccessRequestInclude;
 
 function toIsoString(date: Date): string {
@@ -207,6 +221,88 @@ function isCurrentlyValid(request: AccessRequest, now: Date): boolean {
   return request.endAt === null;
 }
 
+function assertPendingStatus(status: AccessRequestStatus): void {
+  if (status !== AccessRequestStatus.PENDING) {
+    throw new AppError(
+      409,
+      ErrorCodes.CONFLICT,
+      `Access request is already ${status.toLowerCase()}`,
+    );
+  }
+}
+
+function validateTargetEligibleForApproval(request: AccessRequestWithRelations): void {
+  if (!isTargetResourceActive(request)) {
+    throw new AppError(
+      400,
+      ErrorCodes.VALIDATION_ERROR,
+      'Access request target is inactive and cannot be approved',
+    );
+  }
+}
+
+function validateAccessPeriodForApproval(request: AccessRequest, now: Date): void {
+  if (request.accessType === AccessType.TEMPORARY) {
+    if (!request.endAt || request.endAt <= now) {
+      throw new AppError(
+        400,
+        ErrorCodes.VALIDATION_ERROR,
+        'Temporary access request has expired and cannot be approved',
+      );
+    }
+  }
+}
+
+function toApproverInfo(user: { id: string; name: string } | null): ApproverInfo | null {
+  if (!user) {
+    return null;
+  }
+  return { id: user.id, name: user.name };
+}
+
+function toManagerActionResponse(request: AccessRequestWithRequester): ManagerActionResponse {
+  return {
+    id: request.id,
+    status: request.status,
+    approvedAt: request.approvedAt ? toIsoString(request.approvedAt) : null,
+    approvedBy: toApproverInfo(request.approvedBy),
+    rejectionReason: request.rejectionReason,
+  };
+}
+
+function toPendingAccessRequestResponse(
+  request: AccessRequestWithRequester,
+): PendingAccessRequestResponse {
+  return {
+    id: request.id,
+    accessType: request.accessType,
+    startAt: toIsoString(request.startAt),
+    endAt: request.endAt ? toIsoString(request.endAt) : null,
+    reason: request.reason,
+    status: request.status,
+    createdAt: toIsoString(request.createdAt),
+    requester: {
+      id: request.requester.id,
+      name: request.requester.name,
+      email: request.requester.email,
+    },
+    target: buildTargetInfo(request),
+  };
+}
+
+async function loadManagerRequest(requestId: string): Promise<AccessRequestWithRequester> {
+  const request = await prisma.accessRequest.findUnique({
+    where: { id: requestId },
+    include: managerAccessRequestInclude,
+  });
+
+  if (!request) {
+    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Access request not found');
+  }
+
+  return request as AccessRequestWithRequester;
+}
+
 export async function createAccessRequest(
   requesterId: string,
   input: CreateAccessRequestInput,
@@ -322,4 +418,85 @@ export function mapCreateBodyToInput(body: {
           : null,
     reason: body.reason.trim(),
   };
+}
+
+export async function listPendingAccessRequests(): Promise<PendingAccessRequestResponse[]> {
+  const requests = await prisma.accessRequest.findMany({
+    where: { status: AccessRequestStatus.PENDING },
+    include: managerAccessRequestInclude,
+    orderBy: { createdAt: 'asc' },
+  });
+
+  return requests.map((request) =>
+    toPendingAccessRequestResponse(request as AccessRequestWithRequester),
+  );
+}
+
+export async function approveAccessRequest(
+  requestId: string,
+  approverId: string,
+  now: Date = new Date(),
+): Promise<ManagerActionResponse> {
+  const request = await loadManagerRequest(requestId);
+  assertPendingStatus(request.status);
+  validateTargetEligibleForApproval(request);
+  validateAccessPeriodForApproval(request, now);
+
+  const updateResult = await prisma.accessRequest.updateMany({
+    where: {
+      id: requestId,
+      status: AccessRequestStatus.PENDING,
+    },
+    data: {
+      status: AccessRequestStatus.APPROVED,
+      approvedById: approverId,
+      approvedAt: now,
+      rejectionReason: null,
+    },
+  });
+
+  if (updateResult.count === 0) {
+    throw new AppError(
+      409,
+      ErrorCodes.CONFLICT,
+      'Access request is no longer pending',
+    );
+  }
+
+  const updated = await loadManagerRequest(requestId);
+  return toManagerActionResponse(updated);
+}
+
+export async function rejectAccessRequest(
+  requestId: string,
+  approverId: string,
+  rejectionReason: string,
+  now: Date = new Date(),
+): Promise<ManagerActionResponse> {
+  const request = await loadManagerRequest(requestId);
+  assertPendingStatus(request.status);
+
+  const updateResult = await prisma.accessRequest.updateMany({
+    where: {
+      id: requestId,
+      status: AccessRequestStatus.PENDING,
+    },
+    data: {
+      status: AccessRequestStatus.REJECTED,
+      approvedById: approverId,
+      approvedAt: now,
+      rejectionReason: rejectionReason.trim(),
+    },
+  });
+
+  if (updateResult.count === 0) {
+    throw new AppError(
+      409,
+      ErrorCodes.CONFLICT,
+      'Access request is no longer pending',
+    );
+  }
+
+  const updated = await loadManagerRequest(requestId);
+  return toManagerActionResponse(updated);
 }

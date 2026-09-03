@@ -4,17 +4,21 @@ import { ZodError } from 'zod';
 import { AppError } from '../errors/app.error';
 import { ErrorCodes } from '../errors/error-codes';
 import {
+  approveAccessRequest,
   createAccessRequest,
   getAccessRequestById,
   getCurrentAccess,
   listMyAccessRequests,
+  listPendingAccessRequests,
   mapCreateBodyToInput,
+  rejectAccessRequest,
 } from '../services/access-request.service';
 import { getRouteParam, isUuid } from '../utils/query.util';
 import { parseBody, sendData, sendList } from '../utils/response.util';
 import {
   accessRequestStatusFilterSchema,
   createAccessRequestSchema,
+  rejectAccessRequestSchema,
 } from '../validators/access-request.validators';
 import { formatZodError } from '../validators/auth.validators';
 
@@ -101,6 +105,50 @@ export async function getMyAccessHandler(
     const user = requireAuthenticatedUser(req);
     const access = await getCurrentAccess(user.id);
     sendList(res, access);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function listPendingAccessRequestsHandler(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const requests = await listPendingAccessRequests();
+    sendList(res, requests);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function approveAccessRequestHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const user = requireAuthenticatedUser(req);
+    const requestId = parseRequestId(req.params.id);
+    const result = await approveAccessRequest(requestId, user.id);
+    sendData(res, result);
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function rejectAccessRequestHandler(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const user = requireAuthenticatedUser(req);
+    const requestId = parseRequestId(req.params.id);
+    const body = parseBody(rejectAccessRequestSchema, req.body);
+    const result = await rejectAccessRequest(requestId, user.id, body.rejectionReason);
+    sendData(res, result);
   } catch (error) {
     next(error);
   }
