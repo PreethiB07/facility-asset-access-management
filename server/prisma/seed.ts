@@ -1,4 +1,4 @@
-import { PrismaClient, Role, AccessType, AccessRequestStatus } from '@prisma/client';
+import { Role, AccessType, AccessRequestStatus } from '@prisma/client';
 import bcrypt from 'bcrypt';
 import dotenv from 'dotenv';
 import {
@@ -7,12 +7,14 @@ import {
   GLOBEX_INDUSTRIES_NAME,
   LEGACY_COMPANY_ID,
 } from '../src/constants/company.constants';
+import { prisma } from '../src/lib/prisma';
+import { getDb, runWithSystemBootstrap } from '../src/lib/prisma-tenant';
 import { clearCompanySeedData, ensureCompany } from '../src/utils/company-seed';
 import { upsertUserByCompanyEmail } from '../src/utils/user-repository';
 
 dotenv.config();
 
-const prisma = new PrismaClient();
+const db = () => getDb();
 
 const SALT_ROUNDS = 12;
 
@@ -74,7 +76,7 @@ async function seedCompanyData(
 ) {
   await clearCompanySeedData(companyId);
 
-  const mainOperations = await prisma.facility.create({
+  const mainOperations = await db().facility.create({
     data: {
       companyId,
       name: `${prefix} Main Operations Facility`,
@@ -84,7 +86,7 @@ async function seedCompanyData(
     },
   });
 
-  const productionFacility = await prisma.facility.create({
+  const productionFacility = await db().facility.create({
     data: {
       companyId,
       name: `${prefix} Production Facility`,
@@ -94,7 +96,7 @@ async function seedCompanyData(
     },
   });
 
-  const inactiveFacility = await prisma.facility.create({
+  const inactiveFacility = await db().facility.create({
     data: {
       companyId,
       name: `${prefix} Decommissioned Warehouse`,
@@ -104,7 +106,7 @@ async function seedCompanyData(
     },
   });
 
-  const serverRoom = await prisma.area.create({
+  const serverRoom = await db().area.create({
     data: {
       companyId,
       facilityId: mainOperations.id,
@@ -115,7 +117,7 @@ async function seedCompanyData(
     },
   });
 
-  const equipmentRoom = await prisma.area.create({
+  const equipmentRoom = await db().area.create({
     data: {
       companyId,
       facilityId: mainOperations.id,
@@ -126,7 +128,7 @@ async function seedCompanyData(
     },
   });
 
-  const productionFloor = await prisma.area.create({
+  const productionFloor = await db().area.create({
     data: {
       companyId,
       facilityId: productionFacility.id,
@@ -137,7 +139,7 @@ async function seedCompanyData(
     },
   });
 
-  const generator = await prisma.asset.create({
+  const generator = await db().asset.create({
     data: {
       companyId,
       facilityId: mainOperations.id,
@@ -149,7 +151,7 @@ async function seedCompanyData(
     },
   });
 
-  const forklift = await prisma.asset.create({
+  const forklift = await db().asset.create({
     data: {
       companyId,
       facilityId: productionFacility.id,
@@ -161,7 +163,7 @@ async function seedCompanyData(
     },
   });
 
-  const independentAsset = await prisma.asset.create({
+  const independentAsset = await db().asset.create({
     data: {
       companyId,
       facilityId: mainOperations.id,
@@ -176,7 +178,7 @@ async function seedCompanyData(
   const now = new Date();
   const oneWeekLater = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
 
-  await prisma.accessRequest.createMany({
+  await db().accessRequest.createMany({
     data: [
       {
         companyId,
@@ -224,30 +226,37 @@ async function seedCompanyData(
 }
 
 async function main() {
-  const acme = await upsertCompany(LEGACY_COMPANY_ID, ACME_CORPORATION_NAME);
-  const globex = await upsertCompany(GLOBEX_COMPANY_ID, GLOBEX_INDUSTRIES_NAME);
+  await runWithSystemBootstrap(async () => {
+    const acme = await upsertCompany(LEGACY_COMPANY_ID, ACME_CORPORATION_NAME);
+    const globex = await upsertCompany(GLOBEX_COMPANY_ID, GLOBEX_INDUSTRIES_NAME);
 
-  const acmeUsers = await upsertDemoUsers(acme.id, ACME_ACCOUNTS);
-  const globexUsers = await upsertDemoUsers(globex.id, GLOBEX_ACCOUNTS);
+    const acmeUsers = await upsertDemoUsers(acme.id, ACME_ACCOUNTS);
+    const globexUsers = await upsertDemoUsers(globex.id, GLOBEX_ACCOUNTS);
 
-  const acmeData = await seedCompanyData(acme.id, 'Acme', acmeUsers.user, acmeUsers.manager);
-  const globexData = await seedCompanyData(globex.id, 'Globex', globexUsers.user, globexUsers.manager);
+    const acmeData = await seedCompanyData(acme.id, 'Acme', acmeUsers.user, acmeUsers.manager);
+    const globexData = await seedCompanyData(
+      globex.id,
+      'Globex',
+      globexUsers.user,
+      globexUsers.manager,
+    );
 
-  console.log('Seed completed successfully.');
-  console.log('');
-  console.log(`Company A: ${ACME_CORPORATION_NAME} (${acme.id})`);
-  for (const account of ACME_ACCOUNTS) {
-    console.log(`  ${account.role}: ${account.email}`);
-  }
-  console.log(`  Facilities: ${acmeData.facilities.join(', ')}`);
-  console.log('');
-  console.log(`Company B: ${GLOBEX_INDUSTRIES_NAME} (${globex.id})`);
-  for (const account of GLOBEX_ACCOUNTS) {
-    console.log(`  ${account.role}: ${account.email}`);
-  }
-  console.log(`  Facilities: ${globexData.facilities.join(', ')}`);
-  console.log('');
-  console.log('DEVELOPMENT / CHALLENGE ONLY — see docs/demo-accounts.md');
+    console.log('Seed completed successfully.');
+    console.log('');
+    console.log(`Company A: ${ACME_CORPORATION_NAME} (${acme.id})`);
+    for (const account of ACME_ACCOUNTS) {
+      console.log(`  ${account.role}: ${account.email}`);
+    }
+    console.log(`  Facilities: ${acmeData.facilities.join(', ')}`);
+    console.log('');
+    console.log(`Company B: ${GLOBEX_INDUSTRIES_NAME} (${globex.id})`);
+    for (const account of GLOBEX_ACCOUNTS) {
+      console.log(`  ${account.role}: ${account.email}`);
+    }
+    console.log(`  Facilities: ${globexData.facilities.join(', ')}`);
+    console.log('');
+    console.log('DEVELOPMENT / CHALLENGE ONLY — see docs/demo-accounts.md');
+  });
 }
 
 main()

@@ -1,6 +1,6 @@
 import { AppError } from '../errors/app.error';
 import { ErrorCodes } from '../errors/error-codes';
-import { prisma } from '../lib/prisma';
+import { getDb, runWithCompanyContext } from '../lib/prisma-tenant';
 import type { ActiveFilter } from '../utils/query.util';
 import type {
   CreateFacilityInput,
@@ -17,12 +17,14 @@ export async function listFacilities(
   filter: ActiveFilter,
   companyId: string,
 ): Promise<FacilitySummary[]> {
-  const facilities = await prisma.facility.findMany({
-    where: { ...filter, companyId },
-    orderBy: { name: 'asc' },
-  });
+  return runWithCompanyContext(companyId, async () => {
+    const facilities = await getDb().facility.findMany({
+      where: filter,
+      orderBy: { name: 'asc' },
+    });
 
-  return facilities.map(toFacilitySummary);
+    return facilities.map(toFacilitySummary);
+  });
 }
 
 export async function getFacilityById(
@@ -30,38 +32,42 @@ export async function getFacilityById(
   filter: ActiveFilter,
   companyId: string,
 ): Promise<FacilityDetail> {
-  const facility = await prisma.facility.findFirst({
-    where: { id, companyId, ...filter },
-    include: {
-      areas: {
-        where: { companyId, ...filter },
-        orderBy: { name: 'asc' },
+  return runWithCompanyContext(companyId, async () => {
+    const facility = await getDb().facility.findFirst({
+      where: { id, ...filter },
+      include: {
+        areas: {
+          where: filter,
+          orderBy: { name: 'asc' },
+        },
       },
-    },
+    });
+
+    if (!facility) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
+    }
+
+    return {
+      ...toFacilitySummary(facility),
+      areas: facility.areas.map(toAreaSummary),
+    };
   });
-
-  if (!facility) {
-    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
-  }
-
-  return {
-    ...toFacilitySummary(facility),
-    areas: facility.areas.map(toAreaSummary),
-  };
 }
 
 export async function createFacility(
   input: CreateFacilityInput,
   companyId: string,
 ): Promise<FacilitySummary> {
-  const facility = await prisma.facility.create({
-    data: {
-      ...input,
-      companyId,
-    },
-  });
+  return runWithCompanyContext(companyId, async () => {
+    const facility = await getDb().facility.create({
+      data: {
+        ...input,
+        companyId,
+      },
+    });
 
-  return toFacilitySummary(facility);
+    return toFacilitySummary(facility);
+  });
 }
 
 export async function updateFacility(
@@ -69,22 +75,30 @@ export async function updateFacility(
   input: UpdateFacilityInput,
   companyId: string,
 ): Promise<FacilitySummary> {
-  const existing = await prisma.facility.findFirst({ where: { id, companyId } });
+  return runWithCompanyContext(companyId, async () => {
+    const existing = await getDb().facility.findFirst({ where: { id } });
 
-  if (!existing) {
-    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
-  }
+    if (!existing) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
+    }
 
-  const facility = await prisma.facility.update({
-    where: { id },
-    data: input,
+    const facility = await getDb().facility.update({
+      where: { id },
+      data: input,
+    });
+
+    return toFacilitySummary(facility);
   });
-
-  return toFacilitySummary(facility);
 }
 
 export async function assertFacilityInCompany(id: string, companyId: string): Promise<void> {
-  const facility = await prisma.facility.findFirst({ where: { id, companyId } });
+  return runWithCompanyContext(companyId, async () => {
+    await assertFacilityInCompanyTx(id);
+  });
+}
+
+async function assertFacilityInCompanyTx(id: string): Promise<void> {
+  const facility = await getDb().facility.findFirst({ where: { id } });
   if (!facility) {
     throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
   }

@@ -1,5 +1,5 @@
 import type { Prisma, Role } from '@prisma/client';
-import { prisma } from '../lib/prisma';
+import { getDb } from '../lib/prisma-tenant';
 
 interface UpsertUserInput {
   companyId: string;
@@ -12,7 +12,7 @@ interface UpsertUserInput {
 
 /** Lookup by tenant + email without relying on generated compound-unique input types. */
 export async function findUserByCompanyEmail(companyId: string, email: string) {
-  return prisma.user.findFirst({
+  return getDb().user.findFirst({
     where: {
       companyId,
       email: email.toLowerCase(),
@@ -34,7 +34,7 @@ export async function upsertUserByCompanyEmail(input: UpsertUserInput) {
   };
 
   if (existing) {
-    return prisma.user.update({
+    return getDb().user.update({
       where: { id: existing.id },
       data: {
         name: input.name,
@@ -45,5 +45,5 @@ export async function upsertUserByCompanyEmail(input: UpsertUserInput) {
     });
   }
 
-  return prisma.user.create({ data });
+  return getDb().user.create({ data });
 }

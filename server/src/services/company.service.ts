@@ -1,10 +1,10 @@
 import { DEFAULT_REGISTRATION_COMPANY_NAME } from '../constants/company.constants';
 import { AppError } from '../errors/app.error';
 import { ErrorCodes } from '../errors/error-codes';
-import { prisma } from '../lib/prisma';
+import { getDb } from '../lib/prisma-tenant';
 
 export async function getDefaultRegistrationCompanyId(): Promise<string> {
-  const company = await prisma.company.findUnique({
+  const company = await getDb().company.findUnique({
     where: { name: DEFAULT_REGISTRATION_COMPANY_NAME },
     select: { id: true },
   });
@@ -21,7 +21,7 @@ export async function getDefaultRegistrationCompanyId(): Promise<string> {
 }
 
 export async function getCompanyIdByName(name: string): Promise<string> {
-  const company = await prisma.company.findUnique({
+  const company = await getDb().company.findUnique({
     where: { name },
     select: { id: true },
   });

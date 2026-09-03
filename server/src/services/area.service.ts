@@ -1,25 +1,33 @@
 import { AppError } from '../errors/app.error';
 import { ErrorCodes } from '../errors/error-codes';
-import { prisma } from '../lib/prisma';
+import { getDb, runWithCompanyContext } from '../lib/prisma-tenant';
 import type { ActiveFilter } from '../utils/query.util';
 import type { AreaDetail, AreaSummary } from '../types/resource.types';
 import { toAreaDetail, toAreaSummary } from '../types/resource.types';
 import type { CreateAreaInput, UpdateAreaInput } from '../validators/resource.validators';
-import { assertFacilityInCompany } from './facility.service';
+
+async function assertFacilityInCompanyTx(facilityId: string): Promise<void> {
+  const facility = await getDb().facility.findFirst({ where: { id: facilityId } });
+  if (!facility) {
+    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
+  }
+}
 
 export async function listAreasByFacility(
   facilityId: string,
   filter: ActiveFilter,
   companyId: string,
 ): Promise<AreaSummary[]> {
-  await assertFacilityInCompany(facilityId, companyId);
+  return runWithCompanyContext(companyId, async () => {
+    await assertFacilityInCompanyTx(facilityId);
 
-  const areas = await prisma.area.findMany({
-    where: { facilityId, companyId, ...filter },
-    orderBy: { name: 'asc' },
+    const areas = await getDb().area.findMany({
+      where: { facilityId, ...filter },
+      orderBy: { name: 'asc' },
+    });
+
+    return areas.map(toAreaSummary);
   });
-
-  return areas.map(toAreaSummary);
 }
 
 export async function getAreaById(
@@ -27,15 +35,17 @@ export async function getAreaById(
   filter: ActiveFilter,
   companyId: string,
 ): Promise<AreaDetail> {
-  const area = await prisma.area.findFirst({
-    where: { id, companyId, ...filter },
+  return runWithCompanyContext(companyId, async () => {
+    const area = await getDb().area.findFirst({
+      where: { id, ...filter },
+    });
+
+    if (!area) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
+    }
+
+    return toAreaDetail(area);
   });
-
-  if (!area) {
-    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
-  }
-
-  return toAreaDetail(area);
 }
 
 export async function createArea(
@@ -43,17 +53,19 @@ export async function createArea(
   input: CreateAreaInput,
   companyId: string,
 ): Promise<AreaDetail> {
-  await assertFacilityInCompany(facilityId, companyId);
+  return runWithCompanyContext(companyId, async () => {
+    await assertFacilityInCompanyTx(facilityId);
 
-  const area = await prisma.area.create({
-    data: {
-      ...input,
-      facilityId,
-      companyId,
-    },
+    const area = await getDb().area.create({
+      data: {
+        ...input,
+        facilityId,
+        companyId,
+      },
+    });
+
+    return toAreaDetail(area);
   });
-
-  return toAreaDetail(area);
 }
 
 export async function updateArea(
@@ -61,18 +73,20 @@ export async function updateArea(
   input: UpdateAreaInput,
   companyId: string,
 ): Promise<AreaDetail> {
-  const existing = await prisma.area.findFirst({ where: { id, companyId } });
+  return runWithCompanyContext(companyId, async () => {
+    const existing = await getDb().area.findFirst({ where: { id } });
 
-  if (!existing) {
-    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
-  }
+    if (!existing) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
+    }
 
-  const area = await prisma.area.update({
-    where: { id },
-    data: input,
+    const area = await getDb().area.update({
+      where: { id },
+      data: input,
+    });
+
+    return toAreaDetail(area);
   });
-
-  return toAreaDetail(area);
 }
 
 export async function assertAreaBelongsToFacility(
@@ -80,7 +94,13 @@ export async function assertAreaBelongsToFacility(
   facilityId: string,
   companyId: string,
 ): Promise<void> {
-  const area = await prisma.area.findFirst({ where: { id: areaId, companyId } });
+  return runWithCompanyContext(companyId, async () => {
+    await assertAreaBelongsToFacilityTx(areaId, facilityId);
+  });
+}
+
+async function assertAreaBelongsToFacilityTx(areaId: string, facilityId: string): Promise<void> {
+  const area = await getDb().area.findFirst({ where: { id: areaId } });
 
   if (!area) {
     throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
@@ -96,8 +116,10 @@ export async function assertAreaBelongsToFacility(
 }
 
 export async function assertAreaInCompany(areaId: string, companyId: string): Promise<void> {
-  const area = await prisma.area.findFirst({ where: { id: areaId, companyId } });
-  if (!area) {
-    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
-  }
+  return runWithCompanyContext(companyId, async () => {
+    const area = await getDb().area.findFirst({ where: { id: areaId } });
+    if (!area) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
+    }
+  });
 }

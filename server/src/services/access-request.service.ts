@@ -9,7 +9,7 @@ import {
 } from '@prisma/client';
 import { AppError } from '../errors/app.error';
 import { ErrorCodes } from '../errors/error-codes';
-import { prisma } from '../lib/prisma';
+import { getDb, runWithCompanyContext } from '../lib/prisma-tenant';
 import type {
   AccessRequestResponse,
   AccessTargetInfo,
@@ -126,8 +126,8 @@ async function resolveAndValidateTarget(
   companyId: string,
 ): Promise<ResolvedTarget> {
   if (input.facilityId) {
-    const facility = await prisma.facility.findFirst({
-      where: { id: input.facilityId, companyId },
+    const facility = await getDb().facility.findFirst({
+      where: { id: input.facilityId },
     });
     if (!facility) {
       throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
@@ -144,8 +144,8 @@ async function resolveAndValidateTarget(
   }
 
   if (input.areaId) {
-    const area = await prisma.area.findFirst({
-      where: { id: input.areaId, companyId },
+    const area = await getDb().area.findFirst({
+      where: { id: input.areaId },
       include: { facility: true },
     });
     if (!area) {
@@ -166,8 +166,8 @@ async function resolveAndValidateTarget(
   }
 
   if (input.assetId) {
-    const asset = await prisma.asset.findFirst({
-      where: { id: input.assetId, companyId },
+    const asset = await getDb().asset.findFirst({
+      where: { id: input.assetId },
       include: { facility: true, area: true },
     });
     if (!asset) {
@@ -295,12 +295,9 @@ function toPendingAccessRequestResponse(
   };
 }
 
-async function loadManagerRequest(
-  requestId: string,
-  companyId: string,
-): Promise<AccessRequestWithRequester> {
-  const request = await prisma.accessRequest.findFirst({
-    where: { id: requestId, companyId },
+async function loadManagerRequest(requestId: string): Promise<AccessRequestWithRequester> {
+  const request = await getDb().accessRequest.findFirst({
+    where: { id: requestId },
     include: managerAccessRequestInclude,
   });
 
@@ -316,41 +313,43 @@ export async function createAccessRequest(
   input: CreateAccessRequestInput,
   companyId: string,
 ): Promise<AccessRequestResponse> {
-  const requester = await prisma.user.findFirst({
-    where: { id: requesterId, companyId },
-    select: { id: true },
+  return runWithCompanyContext(companyId, async () => {
+    const requester = await getDb().user.findFirst({
+      where: { id: requesterId },
+      select: { id: true },
+    });
+
+    if (!requester) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Requester not found');
+    }
+
+    const target = await resolveAndValidateTarget(input, companyId);
+    const now = new Date();
+
+    const status = target.requiresApproval
+      ? AccessRequestStatus.PENDING
+      : AccessRequestStatus.APPROVED;
+
+    const request = await getDb().accessRequest.create({
+      data: {
+        companyId,
+        requesterId,
+        facilityId: target.facilityId,
+        areaId: target.areaId,
+        assetId: target.assetId,
+        accessType: input.accessType,
+        startAt: input.startAt,
+        endAt: input.endAt,
+        reason: input.reason.trim(),
+        status,
+        approvedAt: status === AccessRequestStatus.APPROVED ? now : null,
+        approvedById: null,
+      },
+      include: accessRequestInclude,
+    });
+
+    return toAccessRequestResponse(request);
   });
-
-  if (!requester) {
-    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Requester not found');
-  }
-
-  const target = await resolveAndValidateTarget(input, companyId);
-  const now = new Date();
-
-  const status = target.requiresApproval
-    ? AccessRequestStatus.PENDING
-    : AccessRequestStatus.APPROVED;
-
-  const request = await prisma.accessRequest.create({
-    data: {
-      companyId,
-      requesterId,
-      facilityId: target.facilityId,
-      areaId: target.areaId,
-      assetId: target.assetId,
-      accessType: input.accessType,
-      startAt: input.startAt,
-      endAt: input.endAt,
-      reason: input.reason.trim(),
-      status,
-      approvedAt: status === AccessRequestStatus.APPROVED ? now : null,
-      approvedById: null,
-    },
-    include: accessRequestInclude,
-  });
-
-  return toAccessRequestResponse(request);
 }
 
 export async function listMyAccessRequests(
@@ -358,17 +357,18 @@ export async function listMyAccessRequests(
   companyId: string,
   status?: AccessRequestStatus,
 ): Promise<AccessRequestResponse[]> {
-  const requests = await prisma.accessRequest.findMany({
-    where: {
-      requesterId,
-      companyId,
-      ...(status ? { status } : {}),
-    },
-    include: accessRequestInclude,
-    orderBy: { createdAt: 'desc' },
-  });
+  return runWithCompanyContext(companyId, async () => {
+    const requests = await getDb().accessRequest.findMany({
+      where: {
+        requesterId,
+        ...(status ? { status } : {}),
+      },
+      include: accessRequestInclude,
+      orderBy: { createdAt: 'desc' },
+    });
 
-  return requests.map(toAccessRequestResponse);
+    return requests.map(toAccessRequestResponse);
+  });
 }
 
 export async function getAccessRequestById(
@@ -376,16 +376,18 @@ export async function getAccessRequestById(
   requesterId: string,
   companyId: string,
 ): Promise<AccessRequestResponse> {
-  const request = await prisma.accessRequest.findFirst({
-    where: { id: requestId, requesterId, companyId },
-    include: accessRequestInclude,
+  return runWithCompanyContext(companyId, async () => {
+    const request = await getDb().accessRequest.findFirst({
+      where: { id: requestId, requesterId },
+      include: accessRequestInclude,
+    });
+
+    if (!request) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Access request not found');
+    }
+
+    return toAccessRequestResponse(request);
   });
-
-  if (!request) {
-    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Access request not found');
-  }
-
-  return toAccessRequestResponse(request);
 }
 
 export async function getCurrentAccess(
@@ -393,30 +395,31 @@ export async function getCurrentAccess(
   companyId: string,
   now: Date = new Date(),
 ): Promise<CurrentAccessResponse[]> {
-  const requests = await prisma.accessRequest.findMany({
-    where: {
-      requesterId,
-      companyId,
-      status: AccessRequestStatus.APPROVED,
-      startAt: { lte: now },
-      OR: [
-        {
-          accessType: AccessType.TEMPORARY,
-          endAt: { gt: now },
-        },
-        {
-          accessType: AccessType.PERMANENT,
-          endAt: null,
-        },
-      ],
-    },
-    include: accessRequestInclude,
-    orderBy: { startAt: 'desc' },
-  });
+  return runWithCompanyContext(companyId, async () => {
+    const requests = await getDb().accessRequest.findMany({
+      where: {
+        requesterId,
+        status: AccessRequestStatus.APPROVED,
+        startAt: { lte: now },
+        OR: [
+          {
+            accessType: AccessType.TEMPORARY,
+            endAt: { gt: now },
+          },
+          {
+            accessType: AccessType.PERMANENT,
+            endAt: null,
+          },
+        ],
+      },
+      include: accessRequestInclude,
+      orderBy: { startAt: 'desc' },
+    });
 
-  return requests
-    .filter((request) => isTargetResourceActive(request) && isCurrentlyValid(request, now))
-    .map(toCurrentAccessResponse);
+    return requests
+      .filter((request) => isTargetResourceActive(request) && isCurrentlyValid(request, now))
+      .map(toCurrentAccessResponse);
+  });
 }
 
 export function mapCreateBodyToInput(body: {
@@ -447,15 +450,17 @@ export function mapCreateBodyToInput(body: {
 export async function listPendingAccessRequests(
   companyId: string,
 ): Promise<PendingAccessRequestResponse[]> {
-  const requests = await prisma.accessRequest.findMany({
-    where: { companyId, status: AccessRequestStatus.PENDING },
-    include: managerAccessRequestInclude,
-    orderBy: { createdAt: 'asc' },
-  });
+  return runWithCompanyContext(companyId, async () => {
+    const requests = await getDb().accessRequest.findMany({
+      where: { status: AccessRequestStatus.PENDING },
+      include: managerAccessRequestInclude,
+      orderBy: { createdAt: 'asc' },
+    });
 
-  return requests.map((request) =>
-    toPendingAccessRequestResponse(request as AccessRequestWithRequester),
-  );
+    return requests.map((request) =>
+      toPendingAccessRequestResponse(request as AccessRequestWithRequester),
+    );
+  });
 }
 
 export async function approveAccessRequest(
@@ -464,34 +469,36 @@ export async function approveAccessRequest(
   companyId: string,
   now: Date = new Date(),
 ): Promise<ManagerActionResponse> {
-  const request = await loadManagerRequest(requestId, companyId);
-  assertPendingStatus(request.status);
-  validateTargetEligibleForApproval(request);
-  validateAccessPeriodForApproval(request, now);
+  return runWithCompanyContext(companyId, async () => {
+    const request = await loadManagerRequest(requestId);
+    assertPendingStatus(request.status);
+    validateTargetEligibleForApproval(request);
+    validateAccessPeriodForApproval(request, now);
 
-  const updateResult = await prisma.accessRequest.updateMany({
-    where: {
-      id: requestId,
-      status: AccessRequestStatus.PENDING,
-    },
-    data: {
-      status: AccessRequestStatus.APPROVED,
-      approvedById: approverId,
-      approvedAt: now,
-      rejectionReason: null,
-    },
+    const updateResult = await getDb().accessRequest.updateMany({
+      where: {
+        id: requestId,
+        status: AccessRequestStatus.PENDING,
+      },
+      data: {
+        status: AccessRequestStatus.APPROVED,
+        approvedById: approverId,
+        approvedAt: now,
+        rejectionReason: null,
+      },
+    });
+
+    if (updateResult.count === 0) {
+      throw new AppError(
+        409,
+        ErrorCodes.CONFLICT,
+        'Access request is no longer pending',
+      );
+    }
+
+    const updated = await loadManagerRequest(requestId);
+    return toManagerActionResponse(updated);
   });
-
-  if (updateResult.count === 0) {
-    throw new AppError(
-      409,
-      ErrorCodes.CONFLICT,
-      'Access request is no longer pending',
-    );
-  }
-
-  const updated = await loadManagerRequest(requestId, companyId);
-  return toManagerActionResponse(updated);
 }
 
 export async function rejectAccessRequest(
@@ -501,30 +508,32 @@ export async function rejectAccessRequest(
   companyId: string,
   now: Date = new Date(),
 ): Promise<ManagerActionResponse> {
-  const request = await loadManagerRequest(requestId, companyId);
-  assertPendingStatus(request.status);
+  return runWithCompanyContext(companyId, async () => {
+    const request = await loadManagerRequest(requestId);
+    assertPendingStatus(request.status);
 
-  const updateResult = await prisma.accessRequest.updateMany({
-    where: {
-      id: requestId,
-      status: AccessRequestStatus.PENDING,
-    },
-    data: {
-      status: AccessRequestStatus.REJECTED,
-      approvedById: approverId,
-      approvedAt: now,
-      rejectionReason: rejectionReason.trim(),
-    },
+    const updateResult = await getDb().accessRequest.updateMany({
+      where: {
+        id: requestId,
+        status: AccessRequestStatus.PENDING,
+      },
+      data: {
+        status: AccessRequestStatus.REJECTED,
+        approvedById: approverId,
+        approvedAt: now,
+        rejectionReason: rejectionReason.trim(),
+      },
+    });
+
+    if (updateResult.count === 0) {
+      throw new AppError(
+        409,
+        ErrorCodes.CONFLICT,
+        'Access request is no longer pending',
+      );
+    }
+
+    const updated = await loadManagerRequest(requestId);
+    return toManagerActionResponse(updated);
   });
-
-  if (updateResult.count === 0) {
-    throw new AppError(
-      409,
-      ErrorCodes.CONFLICT,
-      'Access request is no longer pending',
-    );
-  }
-
-  const updated = await loadManagerRequest(requestId, companyId);
-  return toManagerActionResponse(updated);
 }

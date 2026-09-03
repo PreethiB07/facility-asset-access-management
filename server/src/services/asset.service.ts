@@ -1,32 +1,54 @@
 import { AppError } from '../errors/app.error';
 import { ErrorCodes } from '../errors/error-codes';
-import { prisma } from '../lib/prisma';
+import { getDb, runWithCompanyContext } from '../lib/prisma-tenant';
 import type { ActiveFilter } from '../utils/query.util';
 import type { AssetSummary } from '../types/resource.types';
 import { toAssetSummary } from '../types/resource.types';
 import type { CreateAssetInput, UpdateAssetInput } from '../validators/resource.validators';
-import { assertAreaBelongsToFacility, assertAreaInCompany } from './area.service';
-import { assertFacilityInCompany } from './facility.service';
 
-async function validateAssetRelationships(
+async function assertFacilityInCompanyTx(facilityId: string): Promise<void> {
+  const facility = await getDb().facility.findFirst({ where: { id: facilityId } });
+  if (!facility) {
+    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
+  }
+}
+
+async function assertAreaBelongsToFacilityTx(areaId: string, facilityId: string): Promise<void> {
+  const area = await getDb().area.findFirst({ where: { id: areaId } });
+
+  if (!area) {
+    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
+  }
+
+  if (area.facilityId !== facilityId) {
+    throw new AppError(
+      400,
+      ErrorCodes.VALIDATION_ERROR,
+      'Area does not belong to the specified facility',
+    );
+  }
+}
+
+async function validateAssetRelationshipsTx(
   facilityId: string,
   areaId: string | null | undefined,
-  companyId: string,
 ): Promise<void> {
-  await assertFacilityInCompany(facilityId, companyId);
+  await assertFacilityInCompanyTx(facilityId);
 
   if (areaId) {
-    await assertAreaBelongsToFacility(areaId, facilityId, companyId);
+    await assertAreaBelongsToFacilityTx(areaId, facilityId);
   }
 }
 
 export async function listAssets(filter: ActiveFilter, companyId: string): Promise<AssetSummary[]> {
-  const assets = await prisma.asset.findMany({
-    where: { ...filter, companyId },
-    orderBy: { name: 'asc' },
-  });
+  return runWithCompanyContext(companyId, async () => {
+    const assets = await getDb().asset.findMany({
+      where: filter,
+      orderBy: { name: 'asc' },
+    });
 
-  return assets.map(toAssetSummary);
+    return assets.map(toAssetSummary);
+  });
 }
 
 export async function listAssetsByArea(
@@ -34,14 +56,19 @@ export async function listAssetsByArea(
   filter: ActiveFilter,
   companyId: string,
 ): Promise<AssetSummary[]> {
-  await assertAreaInCompany(areaId, companyId);
+  return runWithCompanyContext(companyId, async () => {
+    const area = await getDb().area.findFirst({ where: { id: areaId } });
+    if (!area) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Area not found');
+    }
 
-  const assets = await prisma.asset.findMany({
-    where: { areaId, companyId, ...filter },
-    orderBy: { name: 'asc' },
+    const assets = await getDb().asset.findMany({
+      where: { areaId, ...filter },
+      orderBy: { name: 'asc' },
+    });
+
+    return assets.map(toAssetSummary);
   });
-
-  return assets.map(toAssetSummary);
 }
 
 export async function getAssetById(
@@ -49,37 +76,41 @@ export async function getAssetById(
   filter: ActiveFilter,
   companyId: string,
 ): Promise<AssetSummary> {
-  const asset = await prisma.asset.findFirst({
-    where: { id, companyId, ...filter },
+  return runWithCompanyContext(companyId, async () => {
+    const asset = await getDb().asset.findFirst({
+      where: { id, ...filter },
+    });
+
+    if (!asset) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Asset not found');
+    }
+
+    return toAssetSummary(asset);
   });
-
-  if (!asset) {
-    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Asset not found');
-  }
-
-  return toAssetSummary(asset);
 }
 
 export async function createAsset(
   input: CreateAssetInput,
   companyId: string,
 ): Promise<AssetSummary> {
-  const areaId = input.areaId ?? null;
-  await validateAssetRelationships(input.facilityId, areaId, companyId);
+  return runWithCompanyContext(companyId, async () => {
+    const areaId = input.areaId ?? null;
+    await validateAssetRelationshipsTx(input.facilityId, areaId);
 
-  const asset = await prisma.asset.create({
-    data: {
-      companyId,
-      facilityId: input.facilityId,
-      areaId,
-      name: input.name,
-      description: input.description,
-      requiresApproval: input.requiresApproval,
-      isActive: input.isActive,
-    },
+    const asset = await getDb().asset.create({
+      data: {
+        companyId,
+        facilityId: input.facilityId,
+        areaId,
+        name: input.name,
+        description: input.description,
+        requiresApproval: input.requiresApproval,
+        isActive: input.isActive,
+      },
+    });
+
+    return toAssetSummary(asset);
   });
-
-  return toAssetSummary(asset);
 }
 
 export async function updateAsset(
@@ -87,25 +118,27 @@ export async function updateAsset(
   input: UpdateAssetInput,
   companyId: string,
 ): Promise<AssetSummary> {
-  const existing = await prisma.asset.findFirst({ where: { id, companyId } });
+  return runWithCompanyContext(companyId, async () => {
+    const existing = await getDb().asset.findFirst({ where: { id } });
 
-  if (!existing) {
-    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Asset not found');
-  }
+    if (!existing) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Asset not found');
+    }
 
-  const facilityId = input.facilityId ?? existing.facilityId;
-  const areaId = input.areaId !== undefined ? input.areaId : existing.areaId;
+    const facilityId = input.facilityId ?? existing.facilityId;
+    const areaId = input.areaId !== undefined ? input.areaId : existing.areaId;
 
-  await validateAssetRelationships(facilityId, areaId, companyId);
+    await validateAssetRelationshipsTx(facilityId, areaId);
 
-  const asset = await prisma.asset.update({
-    where: { id },
-    data: {
-      ...input,
-      facilityId,
-      areaId,
-    },
+    const asset = await getDb().asset.update({
+      where: { id },
+      data: {
+        ...input,
+        facilityId,
+        areaId,
+      },
+    });
+
+    return toAssetSummary(asset);
   });
-
-  return toAssetSummary(asset);
 }
