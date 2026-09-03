@@ -224,3 +224,46 @@ Commit as: `feat: add manager approval workflow`
 ### Rejected suggestions
 
 - Distributed locking — rejected; conditional DB update is sufficient for this stage.
+
+---
+
+## Stage 7 — React Frontend Application
+
+### Prompt
+
+Build a functional React + TypeScript frontend for user registration, login, authentication state, facilities/areas/assets browsing, access request creation, my requests/access, manager pending approvals with approve/reject workflow, role-based navigation, loading/error/empty states, frontend tests, and documentation updates.
+
+Key rules: consume existing REST APIs; do not duplicate backend business logic; backend remains authoritative for authorization; use React Router, Axios, centralized API client with `VITE_API_URL`; protected routes; auth context with token persistence and `/auth/me` restore.
+
+Commit as: `feat: build react frontend for access management`
+
+### What was generated
+
+- `client/.env.example` — `VITE_API_URL`
+- `client/src/services/` — `api.ts`, auth/facility/area/asset/accessRequest services
+- `client/src/context/AuthContext.tsx` — auth provider with login/register/logout/loadCurrentUser
+- `client/src/routes/` — `ProtectedRoute`, `ManagerRoute`
+- `client/src/components/` — layout, common states, access request form, reject modal
+- `client/src/pages/` — login, register, dashboard, facilities, facility/area/asset details, access requests, my access, manager requests, admin placeholder
+- `client/src/types/index.ts` — shared frontend types
+- `client/src/tests/` — auth, access request form, manager, routing tests (Vitest + Testing Library)
+- Updated `README.md` with frontend setup, routes, auth flow, and API integration
+
+### Review notes
+
+- Vite dev proxy (`/api` → port 3001) used when `VITE_API_URL` is unset.
+- JWT stored in `localStorage`; cleared on logout and global 401 handling.
+- Admin page is a placeholder; full admin CRUD UI deferred to Stage 8.
+- Removed Stage 1 health-check homepage in favor of authenticated app shell.
+
+### Important design decisions
+
+- **Service layer:** Axios calls isolated from page components.
+- **Role-aware nav:** Manager/Admin see Pending Approvals; Admin sees Administration link.
+- **Access request form:** Client validation for temporary/permanent date rules; backend validation still mandatory.
+- **Manager reject modal:** Requires non-empty rejection reason before API call.
+
+### Rejected suggestions
+
+- Separate apps per role — rejected; single app with role-based navigation.
+- Duplicating approval/auto-approve logic in frontend — rejected; display driven by API response status.

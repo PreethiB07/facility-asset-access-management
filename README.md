@@ -52,11 +52,14 @@ facility-asset-access-management/
 
 ## Environment Configuration
 
-Copy the example environment file and fill in values locally (never commit `.env`):
+Copy the example environment files and fill in values locally (never commit `.env`):
 
 ```bash
 cp server/.env.example server/.env
+cp client/.env.example client/.env
 ```
+
+### Backend (`server/.env`)
 
 | Variable | Description |
 |----------|-------------|
@@ -65,6 +68,20 @@ cp server/.env.example server/.env
 | `JWT_EXPIRES_IN` | Token lifetime (default: `24h`) |
 | `PORT` | Backend server port (default: `3001`) |
 | `SEED_*_PASSWORD` | Development seed passwords (hashed at runtime) |
+
+### Frontend (`client/.env`)
+
+| Variable | Description |
+|----------|-------------|
+| `VITE_API_URL` | Backend API base URL (default in dev: use Vite proxy with `/api`) |
+
+Example:
+
+```text
+VITE_API_URL=http://localhost:3001/api
+```
+
+During local development, you can omit `client/.env` and rely on the Vite dev-server proxy (`/api` → `http://localhost:3001`).
 
 ## Install Dependencies
 
@@ -100,7 +117,73 @@ cd client
 npm run dev
 ```
 
-The app runs at `http://localhost:5173`. API requests to `/api/*` are proxied to the backend during development.
+The app runs at `http://localhost:5173`. API requests to `/api/*` are proxied to the backend during development when using the default Vite configuration.
+
+## Frontend Application
+
+The React frontend consumes the existing REST APIs. Business rules and authorization remain enforced on the backend.
+
+### Frontend Routes
+
+| Path | Auth | Description |
+|------|------|-------------|
+| `/login` | No | User login |
+| `/register` | No | User registration (creates `USER` role only) |
+| `/dashboard` | Yes | Summary cards for requests and access |
+| `/facilities` | Yes | List active facilities |
+| `/facilities/:id` | Yes | Facility detail, areas, assets, request access |
+| `/areas/:id` | Yes | Area detail and request access |
+| `/assets/:id` | Yes | Asset detail and request access |
+| `/access-requests` | Yes | Own access requests (filter by status) |
+| `/access-requests/:id` | Yes | Own request details |
+| `/my-access` | Yes | Currently valid approved access |
+| `/manager/requests` | Manager/Admin | Pending approvals with approve/reject |
+| `/admin` | Admin (nav) | Administration placeholder (Stage 8) |
+
+Unauthenticated users attempting protected routes are redirected to `/login`.
+
+### Authentication Flow (Frontend)
+
+1. On startup, the app checks for a stored JWT in `localStorage`.
+2. If present, it calls `GET /api/auth/me` to restore the user profile.
+3. Invalid/expired tokens clear auth state and redirect to login on protected routes.
+4. Axios attaches `Authorization: Bearer <token>` to authenticated requests.
+5. A `401` response (except login/register) clears auth state.
+
+Registration redirects to login after success. Login routes users to `/dashboard` regardless of role; navigation adapts by role.
+
+### Role-Based UI
+
+| Role | Navigation extras |
+|------|-------------------|
+| `USER` | Dashboard, Facilities, My Requests, My Access |
+| `MANAGER` | + Pending Approvals |
+| `ADMIN` | + Pending Approvals, Administration |
+
+Frontend role checks are for UX only. All privileged API operations remain protected server-side.
+
+### Frontend Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Vite dev server |
+| `npm run build` | Type-check and production build |
+| `npm run typecheck` | Type-check without emitting |
+| `npm test` | Run frontend tests (Vitest + Testing Library) |
+
+### API Integration
+
+Centralized Axios client: `client/src/services/api.ts`
+
+Service modules:
+
+- `auth.service.ts` — register, login, me
+- `facility.service.ts` — facilities
+- `area.service.ts` — areas and area assets
+- `asset.service.ts` — assets
+- `accessRequest.service.ts` — access requests, my access, manager actions
+
+Base URL: `import.meta.env.VITE_API_URL || '/api'`
 
 ## Authentication
 
@@ -118,8 +201,8 @@ Authentication uses **JWT bearer tokens** and **bcrypt** password hashing.
 | Role | Description |
 |------|-------------|
 | `USER` | Standard user; default for registration |
-| `MANAGER` | Can approve access requests *(future stages)* |
-| `ADMIN` | Full administrative access *(future stages)* |
+| `MANAGER` | Can approve/reject pending access requests |
+| `ADMIN` | Full administrative access (API); admin UI in Stage 8 |
 
 Registration always creates `USER` accounts. Privileged roles are assigned via seed data or future admin tooling — not through public registration.
 
@@ -253,7 +336,8 @@ Response:
 4. ~~Facilities, areas, and assets REST APIs~~
 5. ~~Access request creation workflow~~
 6. ~~Manager approval and rejection workflow~~
-7. React frontend — authentication, facilities, access requests, manager dashboard
+7. ~~React frontend — authentication, facilities, access requests, manager dashboard~~
+8. Admin management UI + application polish + final testing/review
 
 ## Scripts
 
@@ -268,3 +352,4 @@ Response:
 | `client/` | `npm run dev` | Start Vite dev server |
 | `client/` | `npm run build` | Type-check and production build |
 | `client/` | `npm run typecheck` | Type-check without emitting |
+| `client/` | `npm test` | Run frontend tests |
