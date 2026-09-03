@@ -7,24 +7,8 @@ import StatusBadge from '../components/common/StatusBadge';
 import { accessRequestApi } from '../services/accessRequest.service';
 import { formatAccessPeriod, formatDateTime } from '../utils/dates';
 import { getErrorMessage } from '../utils/errors';
+import { formatTargetPath } from '../utils/targetPath';
 import type { AccessRequest } from '../types';
-
-function formatTargetPath(target: AccessRequest['target']): string {
-  if (target.type === 'FACILITY') {
-    return 'Facility';
-  }
-  if (target.type === 'AREA') {
-    return `Area → ${target.facilityName ?? 'Facility'}`;
-  }
-  const parts = ['Asset'];
-  if (target.areaName) {
-    parts.push(`→ ${target.areaName}`);
-  }
-  if (target.facilityName) {
-    parts.push(`→ ${target.facilityName}`);
-  }
-  return parts.join(' ');
-}
 
 export default function AccessRequestDetailPage() {
   const { id } = useParams<{ id: string }>();

@@ -89,7 +89,9 @@ describe('Admin access', () => {
     renderAdminRoute('ADMIN');
     expect(await screen.findByRole('heading', { name: /administration/i })).toBeInTheDocument();
     expect(screen.getByRole('tab', { name: /facilities/i })).toBeInTheDocument();
-    expect(facilityApi.list).toHaveBeenCalled();
+    await waitFor(() => {
+      expect(facilityApi.list).toHaveBeenCalled();
+    });
   });
 
   it('USER cannot access admin pages', async () => {
