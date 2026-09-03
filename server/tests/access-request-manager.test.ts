@@ -156,7 +156,7 @@ describe('Pending access requests', () => {
     );
   });
 
-  it('includes requester information', async () => {
+  it('includes beneficiary information', async () => {
     const facilityId = await createFacility(adminToken, 'Pending Requester Facility');
     await createPendingFacilityRequest(userToken, facilityId);
 
@@ -168,12 +168,17 @@ describe('Pending access requests', () => {
       (entry: { target: { name: string } }) =>
         entry.target.name === `${TEST_RESOURCE_PREFIX} Pending Requester Facility`,
     );
-    expect(item.requester).toMatchObject({
+    expect(item.requestedFor).toMatchObject({
       id: expect.any(String),
       name: expect.any(String),
       email: expect.any(String),
     });
-    expect(item.requester).not.toHaveProperty('passwordHash');
+    expect(item.createdBy).toMatchObject({
+      id: expect.any(String),
+      name: expect.any(String),
+      email: expect.any(String),
+    });
+    expect(item.requestedFor).not.toHaveProperty('passwordHash');
   });
 
   it('includes target information', async () => {

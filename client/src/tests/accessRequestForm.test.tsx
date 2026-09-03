@@ -2,14 +2,33 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import AccessRequestForm from '../components/access/AccessRequestForm';
+import { AuthProvider } from '../context/AuthContext';
 import { ToastProvider } from '../context/ToastContext';
 import { accessRequestApi } from '../services/accessRequest.service';
+import { authApi } from '../services/auth.service';
+
+vi.mock('../services/auth.service', () => ({
+  authApi: {
+    login: vi.fn(),
+    register: vi.fn(),
+    me: vi.fn(),
+    saveToken: vi.fn(),
+    clearToken: vi.fn(),
+    getStoredToken: vi.fn(() => 'token'),
+  },
+}));
 
 vi.mock('../services/accessRequest.service', () => ({
   accessRequestApi: {
     create: vi.fn(),
   },
 }));
+
+const mockUser = {
+  id: 'user-1',
+  name: 'Test User',
+  email: 'user@example.com',
+};
 
 const target = {
   type: 'ASSET' as const,
@@ -19,10 +38,21 @@ const target = {
 };
 
 function renderForm() {
+  vi.mocked(authApi.me).mockResolvedValue({
+    id: 'user-1',
+    companyId: 'company-1',
+    name: 'Test User',
+    email: 'user@example.com',
+    role: 'USER',
+    isActive: true,
+  });
+
   return render(
-    <ToastProvider>
-      <AccessRequestForm target={target} />
-    </ToastProvider>,
+    <AuthProvider>
+      <ToastProvider>
+        <AccessRequestForm target={target} />
+      </ToastProvider>
+    </AuthProvider>,
   );
 }
 
@@ -35,7 +65,7 @@ describe('Access request form', () => {
     renderForm();
     expect(screen.getByLabelText(/access type/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/start date/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/why do you need access/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/why is access needed/i)).toBeInTheDocument();
     expect(screen.getByText(/access target/i)).toBeInTheDocument();
   });
 
@@ -44,7 +74,7 @@ describe('Access request form', () => {
     renderForm();
 
     await user.selectOptions(screen.getByLabelText(/access type/i), 'TEMPORARY');
-    await user.type(screen.getByLabelText(/why do you need access/i), 'Need access for maintenance');
+    await user.type(screen.getByLabelText(/why is access needed/i), 'Need access for maintenance');
     await user.click(screen.getByRole('button', { name: /submit request/i }));
 
     expect(
@@ -68,7 +98,7 @@ describe('Access request form', () => {
     await user.selectOptions(screen.getByLabelText(/access type/i), 'TEMPORARY');
     await user.type(screen.getByLabelText(/start date/i), '2030-06-01T10:00');
     await user.type(screen.getByLabelText(/end date/i), '2030-06-01T09:00');
-    await user.type(screen.getByLabelText(/why do you need access/i), 'Maintenance');
+    await user.type(screen.getByLabelText(/why is access needed/i), 'Maintenance');
     await user.click(screen.getByRole('button', { name: /submit request/i }));
 
     expect(await screen.findByText('End date must be after the start date')).toBeInTheDocument();
@@ -103,6 +133,8 @@ describe('Access request form', () => {
                 rejectionReason: null,
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
+                createdBy: mockUser,
+                requestedFor: mockUser,
                 target: { type: 'ASSET', id: 'asset-1', name: 'Server Rack A' },
               }),
             100,
@@ -114,7 +146,7 @@ describe('Access request form', () => {
 
     await user.selectOptions(screen.getByLabelText(/access type/i), 'PERMANENT');
     await user.type(screen.getByLabelText(/start date/i), '2030-01-01T09:00');
-    await user.type(screen.getByLabelText(/why do you need access/i), 'Project work');
+    await user.type(screen.getByLabelText(/why is access needed/i), 'Project work');
     await user.click(screen.getByRole('button', { name: /submit request/i }));
 
     expect(screen.getByRole('button', { name: /submitting/i })).toBeDisabled();
@@ -134,6 +166,8 @@ describe('Access request form', () => {
       rejectionReason: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      createdBy: mockUser,
+      requestedFor: mockUser,
       target: { type: 'ASSET', id: 'asset-1', name: 'Server Rack A' },
     });
 
@@ -141,7 +175,7 @@ describe('Access request form', () => {
 
     await user.selectOptions(screen.getByLabelText(/access type/i), 'PERMANENT');
     await user.type(screen.getByLabelText(/start date/i), '2030-01-01T09:00');
-    await user.type(screen.getByLabelText(/why do you need access/i), 'Project work');
+    await user.type(screen.getByLabelText(/why is access needed/i), 'Project work');
     await user.click(screen.getByRole('button', { name: /submit request/i }));
 
     expect(await screen.findByText('Access has been approved.')).toBeInTheDocument();
@@ -161,7 +195,7 @@ describe('Access request form', () => {
 
     await user.selectOptions(screen.getByLabelText(/access type/i), 'PERMANENT');
     await user.type(screen.getByLabelText(/start date/i), '2030-01-01T09:00');
-    await user.type(screen.getByLabelText(/why do you need access/i), 'Need access');
+    await user.type(screen.getByLabelText(/why is access needed/i), 'Need access');
     await user.click(screen.getByRole('button', { name: /submit request/i }));
 
     expect(await screen.findByText('Target requires approval')).toBeInTheDocument();
@@ -181,6 +215,8 @@ describe('Access request form', () => {
       rejectionReason: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
+      createdBy: mockUser,
+      requestedFor: mockUser,
       target: { type: 'ASSET', id: 'asset-1', name: 'Server Rack A' },
     });
 
@@ -188,7 +224,7 @@ describe('Access request form', () => {
 
     await user.selectOptions(screen.getByLabelText(/access type/i), 'PERMANENT');
     await user.type(screen.getByLabelText(/start date/i), '2030-01-01T09:00');
-    await user.type(screen.getByLabelText(/why do you need access/i), 'Long term');
+    await user.type(screen.getByLabelText(/why is access needed/i), 'Long term');
     await user.click(screen.getByRole('button', { name: /submit request/i }));
 
     await waitFor(() => {

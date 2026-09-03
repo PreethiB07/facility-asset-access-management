@@ -65,6 +65,22 @@ export default function AccessRequestDetailPage() {
       <PageHeader title={`Access Request #${request.id.slice(0, 8)}`} />
 
       <section className="detail-section">
+        <h2 className="detail-section-title">People</h2>
+        <div className="detail-grid">
+          {request.createdBy.id !== request.requestedFor.id && (
+            <div className="detail-item">
+              <span className="detail-label">Created by</span>
+              <span>{request.createdBy.name}</span>
+            </div>
+          )}
+          <div className="detail-item">
+            <span className="detail-label">Requested for</span>
+            <span>{request.requestedFor.name}</span>
+          </div>
+        </div>
+      </section>
+
+      <section className="detail-section">
         <h2 className="detail-section-title">Status</h2>
         <StatusBadge status={request.status} />
         {request.status === 'PENDING' && (

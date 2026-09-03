@@ -42,11 +42,17 @@ const pendingRequest = {
   reason: 'Maintenance window',
   status: 'PENDING' as const,
   createdAt: '2026-01-01T10:00:00.000Z',
-  requester: {
+  createdBy: {
     id: 'user-1',
     name: 'Jane User',
     email: 'jane@example.com',
   },
+  requestedFor: {
+    id: 'user-1',
+    name: 'Jane User',
+    email: 'jane@example.com',
+  },
+  canApprove: true,
   target: {
     type: 'FACILITY' as const,
     id: 'fac-1',

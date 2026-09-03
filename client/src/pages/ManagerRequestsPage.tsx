@@ -10,6 +10,14 @@ import { formatAccessPeriod, formatDateTime } from '../utils/dates';
 import { getErrorMessage } from '../utils/errors';
 import type { PendingAccessRequest } from '../types';
 
+function formatBeneficiaryLabel(request: PendingAccessRequest): string {
+  if (request.createdBy.id === request.requestedFor.id) {
+    return request.requestedFor.name;
+  }
+
+  return `${request.requestedFor.name} (created by ${request.createdBy.name})`;
+}
+
 export default function ManagerRequestsPage() {
   const { showSuccess, showError } = useToast();
   const [requests, setRequests] = useState<PendingAccessRequest[]>([]);
@@ -85,7 +93,8 @@ export default function ManagerRequestsPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>Requester</th>
+                  <th>Requested for</th>
+                  <th>Created by</th>
                   <th>Target</th>
                   <th>Type</th>
                   <th>Access</th>
@@ -99,9 +108,14 @@ export default function ManagerRequestsPage() {
                 {requests.map((request) => (
                   <tr key={request.id}>
                     <td>
-                      {request.requester.name}
+                      {request.requestedFor.name}
                       <br />
-                      <span className="text-muted">{request.requester.email}</span>
+                      <span className="text-muted">{request.requestedFor.email}</span>
+                    </td>
+                    <td>
+                      {request.createdBy.id === request.requestedFor.id
+                        ? 'Self'
+                        : request.createdBy.name}
                     </td>
                     <td>{request.target.name}</td>
                     <td>{request.target.type}</td>
@@ -110,21 +124,27 @@ export default function ManagerRequestsPage() {
                     <td>{request.reason}</td>
                     <td>{formatDateTime(request.createdAt)}</td>
                     <td className="actions-cell">
-                      <button
-                        type="button"
-                        className="btn btn-primary btn-sm"
-                        onClick={() => setConfirmApproveId(request.id)}
-                        disabled={approvingId === request.id}
-                      >
-                        {approvingId === request.id ? 'Approving...' : 'Approve'}
-                      </button>
-                      <button
-                        type="button"
-                        className="btn btn-danger btn-sm"
-                        onClick={() => setRejectingId(request.id)}
-                      >
-                        Reject
-                      </button>
+                      {request.canApprove ? (
+                        <>
+                          <button
+                            type="button"
+                            className="btn btn-primary btn-sm"
+                            onClick={() => setConfirmApproveId(request.id)}
+                            disabled={approvingId === request.id}
+                          >
+                            {approvingId === request.id ? 'Approving...' : 'Approve'}
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-danger btn-sm"
+                            onClick={() => setRejectingId(request.id)}
+                          >
+                            Reject
+                          </button>
+                        </>
+                      ) : (
+                        <span className="text-muted">You created this request</span>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -137,26 +157,32 @@ export default function ManagerRequestsPage() {
               <article key={request.id} className="list-card">
                 <h3>{request.target.name}</h3>
                 <p>
-                  <strong>Requester:</strong> {request.requester.name}
+                  <strong>Requested for:</strong> {formatBeneficiaryLabel(request)}
                 </p>
                 <p className="text-muted">{request.reason}</p>
                 <p>{formatAccessPeriod(request.accessType, request.startAt, request.endAt)}</p>
                 <div className="actions-cell">
-                  <button
-                    type="button"
-                    className="btn btn-primary btn-sm"
-                    onClick={() => setConfirmApproveId(request.id)}
-                    disabled={approvingId === request.id}
-                  >
-                    Approve
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-danger btn-sm"
-                    onClick={() => setRejectingId(request.id)}
-                  >
-                    Reject
-                  </button>
+                  {request.canApprove ? (
+                    <>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={() => setConfirmApproveId(request.id)}
+                        disabled={approvingId === request.id}
+                      >
+                        Approve
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-danger btn-sm"
+                        onClick={() => setRejectingId(request.id)}
+                      >
+                        Reject
+                      </button>
+                    </>
+                  ) : (
+                    <span className="text-muted">You created this request</span>
+                  )}
                 </div>
               </article>
             ))}

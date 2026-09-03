@@ -1,8 +1,11 @@
 import { useState, type FormEvent } from 'react';
 import { useToast } from '../../context/ToastContext';
+import { useAuth, useIsManagerOrAdmin } from '../../context/AuthContext';
 import { accessRequestApi } from '../../services/accessRequest.service';
+import { employeeApi } from '../../services/employee.service';
 import { getErrorMessage } from '../../utils/errors';
-import type { AccessRequest, AccessRequestTarget, AccessType } from '../../types';
+import type { AccessRequest, AccessRequestTarget, AccessType, EmployeeSummary } from '../../types';
+import { useEffect } from 'react';
 
 interface AccessRequestFormProps {
   target: AccessRequestTarget;
@@ -10,19 +13,29 @@ interface AccessRequestFormProps {
 }
 
 interface FormErrors {
+  beneficiary?: string;
   accessType?: string;
   startAt?: string;
   endAt?: string;
   reason?: string;
 }
 
+type BeneficiaryMode = 'myself' | 'employee';
+
 function validateForm(
+  isManager: boolean,
+  beneficiaryMode: BeneficiaryMode,
+  selectedEmployeeId: string,
   accessType: AccessType | '',
   startAt: string,
   endAt: string,
   reason: string,
 ): FormErrors {
   const errors: FormErrors = {};
+
+  if (isManager && beneficiaryMode === 'employee' && !selectedEmployeeId) {
+    errors.beneficiary = 'Please select an employee';
+  }
 
   if (!accessType) {
     errors.accessType = 'Please select an access type';
@@ -79,7 +92,12 @@ function TargetSummary({ target }: { target: AccessRequestTarget }) {
 }
 
 export default function AccessRequestForm({ target, onSuccess }: AccessRequestFormProps) {
+  const { user } = useAuth();
+  const isManager = useIsManagerOrAdmin();
   const { showSuccess, showError } = useToast();
+  const [beneficiaryMode, setBeneficiaryMode] = useState<BeneficiaryMode>('myself');
+  const [employees, setEmployees] = useState<EmployeeSummary[]>([]);
+  const [selectedEmployeeId, setSelectedEmployeeId] = useState('');
   const [accessType, setAccessType] = useState<AccessType | ''>('');
   const [startAt, setStartAt] = useState('');
   const [endAt, setEndAt] = useState('');
@@ -87,10 +105,33 @@ export default function AccessRequestForm({ target, onSuccess }: AccessRequestFo
   const [errors, setErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
 
+  useEffect(() => {
+    if (!isManager) {
+      return;
+    }
+
+    void employeeApi
+      .list()
+      .then((data) => {
+        setEmployees(data.filter((employee) => employee.id !== user?.id));
+      })
+      .catch(() => {
+        setEmployees([]);
+      });
+  }, [isManager, user?.id]);
+
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
 
-    const validationErrors = validateForm(accessType, startAt, endAt, reason);
+    const validationErrors = validateForm(
+      isManager,
+      beneficiaryMode,
+      selectedEmployeeId,
+      accessType,
+      startAt,
+      endAt,
+      reason,
+    );
     setErrors(validationErrors);
     if (Object.keys(validationErrors).length > 0) {
       return;
@@ -106,6 +147,8 @@ export default function AccessRequestForm({ target, onSuccess }: AccessRequestFo
         ...(target.type === 'AREA' && { areaId: target.areaId }),
         ...(target.type === 'ASSET' && { assetId: target.assetId }),
         ...(accessType === 'TEMPORARY' && { endAt: new Date(endAt).toISOString() }),
+        ...(isManager &&
+          beneficiaryMode === 'employee' && { requestedForId: selectedEmployeeId }),
       };
 
       const request = await accessRequestApi.create(payload);
@@ -118,6 +161,8 @@ export default function AccessRequestForm({ target, onSuccess }: AccessRequestFo
         showSuccess(`Request submitted with status: ${request.status}`);
       }
 
+      setBeneficiaryMode('myself');
+      setSelectedEmployeeId('');
       setAccessType('');
       setStartAt('');
       setEndAt('');
@@ -130,6 +175,8 @@ export default function AccessRequestForm({ target, onSuccess }: AccessRequestFo
     }
   }
 
+  const selectedEmployee = employees.find((employee) => employee.id === selectedEmployeeId);
+
   return (
     <section className="card access-form-card">
       <h2>Request Access</h2>
@@ -140,6 +187,52 @@ export default function AccessRequestForm({ target, onSuccess }: AccessRequestFo
       </div>
 
       <form onSubmit={handleSubmit} noValidate>
+        {isManager && (
+          <div className="form-section">
+            <h3>Request access for</h3>
+            <div className="form-group">
+              <label htmlFor="beneficiaryMode">Beneficiary</label>
+              <select
+                id="beneficiaryMode"
+                value={beneficiaryMode}
+                onChange={(e) => {
+                  setBeneficiaryMode(e.target.value as BeneficiaryMode);
+                  setSelectedEmployeeId('');
+                }}
+              >
+                <option value="myself">Myself</option>
+                <option value="employee">Employee</option>
+              </select>
+            </div>
+
+            {beneficiaryMode === 'employee' && (
+              <div className="form-group">
+                <label htmlFor="employeeSelect">
+                  Employee <span className="required-indicator">*</span>
+                </label>
+                <select
+                  id="employeeSelect"
+                  value={selectedEmployeeId}
+                  onChange={(e) => setSelectedEmployeeId(e.target.value)}
+                >
+                  <option value="">Select an employee</option>
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.name} ({employee.email})
+                    </option>
+                  ))}
+                </select>
+                {selectedEmployee && (
+                  <p className="field-hint">
+                    Access will be granted to {selectedEmployee.name} if approved.
+                  </p>
+                )}
+                {errors.beneficiary && <span className="field-error">{errors.beneficiary}</span>}
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="form-section">
           <h3>Access period</h3>
 
@@ -193,14 +286,14 @@ export default function AccessRequestForm({ target, onSuccess }: AccessRequestFo
           <h3>Reason</h3>
           <div className="form-group">
             <label htmlFor="reason">
-              Why do you need access? <span className="required-indicator">*</span>
+              Why is access needed? <span className="required-indicator">*</span>
             </label>
             <textarea
               id="reason"
               rows={4}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
-              placeholder="Explain why you need access"
+              placeholder="Explain why access is needed"
             />
             {errors.reason && <span className="field-error">{errors.reason}</span>}
           </div>
