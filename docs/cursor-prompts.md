@@ -116,3 +116,42 @@ Commit as: `feat: implement jwt authentication and authorization`
 
 - Trusting role from JWT alone without DB lookup for `isActive` — rejected; middleware re-validates user state.
 - Allowing role selection during registration — rejected per security requirements.
+
+---
+
+## Stage 4 — Facility, Area & Asset REST APIs
+
+### Prompt
+
+Implement REST APIs to browse and manage facilities, areas, and assets using existing Prisma models and JWT auth. GET endpoints for authenticated users; POST/PATCH for ADMIN only; Zod validation; inactive resource filtering; `{ data: ... }` response format; comprehensive API tests.
+
+Commit as: `feat: add facility area and asset APIs`
+
+### What was generated
+
+- `server/src/services/facility.service.ts`, `area.service.ts`, `asset.service.ts`
+- `server/src/controllers/facility.controller.ts`, `area.controller.ts`, `asset.controller.ts`
+- `server/src/routes/facility.routes.ts`, `area.routes.ts`, `asset.routes.ts`
+- `server/src/validators/resource.validators.ts` — Zod schemas for create/update
+- `server/src/types/resource.types.ts` — response mappers (no internal fields)
+- `server/src/utils/query.util.ts` — active/inactive filter by role
+- `server/tests/resources.test.ts` — 27 resource API tests
+
+### Review notes
+
+- No Prisma schema changes required.
+- Deactivation via `isActive: false` on PATCH; no DELETE endpoints.
+- Asset `areaId` optional; facility/area consistency validated in service layer.
+- USER/MANAGER see active resources by default; ADMIN sees all unless filtered.
+
+### Important design decisions
+
+- **`{ data }` wrapper** for resource APIs (auth endpoints retain existing format).
+- **ADMIN-only mutations** — MANAGER cannot create/update resources in this stage.
+- **Area-facility integrity** — creating/updating assets validates `areaId` belongs to `facilityId`.
+- **Inactive filtering at query level** — inactive resources hidden from normal users without deletion.
+
+### Rejected suggestions
+
+- DELETE endpoints — rejected; deactivation preserves access-request history.
+- MANAGER write access — rejected; only ADMIN per stage requirements.

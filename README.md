@@ -150,6 +150,62 @@ Registration always creates `USER` accounts. Privileged roles are assigned via s
 }
 ```
 
+## Resource APIs
+
+All resource endpoints require JWT authentication. Responses use `{ "data": ... }` for single resources and `{ "data": [...] }` for collections.
+
+### Authorization Rules
+
+| Operation | USER | MANAGER | ADMIN |
+|-----------|------|---------|-------|
+| View facilities, areas, assets | Yes | Yes | Yes |
+| Create/update resources | No | No | Yes |
+
+Administrative mutations are enforced server-side via `requireRole(Role.ADMIN)`.
+
+### Inactive Resources
+
+- Resources are deactivated with `isActive: false` (no DELETE endpoints).
+- **USER / MANAGER:** default to active resources only (`?active=true` implicit).
+- **ADMIN:** sees all resources by default; use `?active=true` or `?active=false` to filter.
+- Historical access requests are preserved when resources are deactivated.
+
+### Facility Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/facilities` | Yes | List facilities |
+| GET | `/api/facilities/:id` | Yes | Facility detail with areas |
+| POST | `/api/facilities` | Admin | Create facility |
+| PATCH | `/api/facilities/:id` | Admin | Update/deactivate facility |
+| GET | `/api/facilities/:facilityId/areas` | Yes | List areas in facility |
+| POST | `/api/facilities/:facilityId/areas` | Admin | Create area |
+
+### Area Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/areas/:id` | Yes | Area detail |
+| PATCH | `/api/areas/:id` | Admin | Update/deactivate area |
+| GET | `/api/areas/:areaId/assets` | Yes | List assets in area |
+
+### Asset Endpoints
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| GET | `/api/assets` | Yes | List all assets |
+| GET | `/api/assets/:id` | Yes | Asset detail |
+| POST | `/api/assets` | Admin | Create asset |
+| PATCH | `/api/assets/:id` | Admin | Update/deactivate asset |
+
+Assets may belong to an area (`areaId` set) or directly to a facility (`areaId = null`). When `areaId` is provided, it must belong to the specified `facilityId`.
+
+### Query Parameters
+
+| Param | Values | Description |
+|-------|--------|-------------|
+| `active` | `true`, `false` | Filter by active status (admin can omit for all) |
+
 ## Health Endpoint
 
 ```
@@ -169,7 +225,7 @@ Response:
 1. ~~Repository & project scaffold~~
 2. ~~PostgreSQL + Prisma database setup~~
 3. ~~Authentication (JWT + bcrypt)~~
-4. Facilities, areas, and assets CRUD
+4. ~~Facilities, areas, and assets REST APIs~~
 5. Access requests and manager approval workflow
 6. Automated API and business-logic tests
 
