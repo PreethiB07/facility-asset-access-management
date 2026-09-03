@@ -28,7 +28,7 @@ Documented at final QA (Stage 9). Only genuine, non-critical items are listed.
 
 **Impact:** MANAGER and ADMIN accounts must be created via database seed or direct DB update; public registration always creates USER.
 
-**Workaround:** Use `npm run db:seed` with `SEED_*_PASSWORD` env vars for development/demo accounts.
+**Workaround:** Use `npm run db:seed` to create demo MANAGER/ADMIN accounts. See [docs/demo-accounts.md](demo-accounts.md).
 
 **Future improvement:** Admin user management screen with role assignment audit trail.
 

@@ -150,7 +150,7 @@ Area and Asset FK columns (`facilityId`, `areaId`) rely on PostgreSQL FK indexes
 
 Development seed (`server/prisma/seed.ts`) creates:
 
-- **Users:** Admin, Manager, Normal User (passwords hashed from `SEED_*_PASSWORD` env vars)
+- **Users:** Demo Admin, Demo Manager, Demo User (passwords hashed in seed; see `docs/demo-accounts.md`)
 - **Facilities:** Active (requires approval), auto-approve, inactive
 - **Areas:** Area 1, Area 2, inactive area
 - **Assets:** Asset 1–3 in areas, independent facility-level asset, inactive asset

@@ -108,6 +108,7 @@ facility-asset-access-management/
     └── access-request-workflow.md
     └── requirement-checklist.md
     └── known-issues.md
+    └── demo-accounts.md
 ```
 
 ## Prerequisites
@@ -133,7 +134,8 @@ cp client/.env.example client/.env
 | `JWT_SECRET` | Secret for signing JWT tokens |
 | `JWT_EXPIRES_IN` | Token lifetime (default: `24h`) |
 | `PORT` | Backend server port (default: `3001`) |
-| `SEED_*_PASSWORD` | Development seed passwords (hashed at runtime) |
+
+Demo account passwords are **not** stored in environment variables. They are defined in the seed script (hashed at runtime) and documented in [docs/demo-accounts.md](docs/demo-accounts.md) for **DEVELOPMENT / CHALLENGE ONLY** use.
 
 ### Frontend (`client/.env`)
 
@@ -181,7 +183,7 @@ Prisma schema validates with `npm run db:validate`. A single initial migration e
 ```bash
 # 1. Configure environment
 cp server/.env.example server/.env
-# Edit DATABASE_URL, JWT_SECRET, SEED_*_PASSWORD
+# Edit DATABASE_URL and JWT_SECRET
 
 # 2. Install and migrate
 cd server && npm install && npm run db:migrate && npm run db:seed
@@ -193,11 +195,23 @@ cd server && npm run dev
 cd client && npm install && npm run dev
 ```
 
-Open `http://localhost:5173`. Seed users (passwords from your `SEED_*_PASSWORD` values):
+Open `http://localhost:5173`.
 
-- `admin@example.com` — ADMIN
-- `manager@example.com` — MANAGER
-- `user@example.com` — USER
+## Demo Accounts (DEVELOPMENT / CHALLENGE ONLY)
+
+After seeding, use the accounts documented in [docs/demo-accounts.md](docs/demo-accounts.md):
+
+| Role | Email |
+|------|-------|
+| USER | demo.user@example.com |
+| MANAGER | demo.manager@example.com |
+| ADMIN | demo.admin@example.com |
+
+Passwords are listed in `docs/demo-accounts.md` only — never in `.env` or the login UI (development mode shows email shortcuts without passwords).
+
+```bash
+cd server && npm run db:seed
+```
 
 ## Start the Backend
 

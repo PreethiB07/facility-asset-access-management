@@ -49,7 +49,8 @@ Status values: **PASS**, **PARTIAL**, **NOT IMPLEMENTED**
 | Error handling | AppError + error middleware | PASS | No stack traces in responses | Server logs unexpected errors only |
 | Automated backend tests | Vitest + Supertest | PASS | 123 tests passing | |
 | Frontend | React + TypeScript + Vite | PASS | `client/` | |
-| Responsive UX | Mobile card layouts, sidebar wrap | PASS | `index.css` desktop-only/mobile-only | |
+| Responsive UX | Mobile drawer nav, facility cards, card layouts | PASS | `AppLayout.tsx`, `index.css` | |
+| Demo accounts | Seed + docs for USER/MANAGER/ADMIN | PASS | `docs/demo-accounts.md`, `prisma/seed.ts` | DEVELOPMENT / CHALLENGE ONLY |
 | Password visibility toggle | `PasswordInput` on all password fields | PASS | Grep: no raw `type="password"`; `password.test.tsx` | |
 
 ---
@@ -74,10 +75,10 @@ Status values: **PASS**, **PARTIAL**, **NOT IMPLEMENTED**
 
 | Screen | Status | Evidence | Notes |
 |--------|--------|----------|-------|
-| Login | PASS | `LoginPage.tsx`, auth tests | Eye toggle, loading, validation |
+| Login | PASS | `LoginPage.tsx`, auth tests | Branding, dev-only demo email shortcuts, eye toggle |
 | Registration | PASS | `RegisterPage.tsx`, auth tests | No role selection |
-| Dashboard | PASS | `DashboardPage.tsx` | Role-aware pending count |
-| Facilities | PASS | `FacilitiesPage.tsx` | Loading/empty/error |
+| Dashboard | PASS | `DashboardPage.tsx` | Welcome message, role-aware stats |
+| Facilities | PASS | `FacilitiesPage.tsx` | Card grid, status badges, loading/empty/error |
 | Facility details | PASS | `FacilityDetailPage.tsx` | Areas + independent/area assets |
 | Area details | PASS | `AreaDetailPage.tsx` | Request access form |
 | Asset details | PASS | `AssetDetailPage.tsx` | |

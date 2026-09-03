@@ -335,6 +335,27 @@ Commit as: `chore: complete final qa and submission review`
 - Server `console.error` retained for unexpected errors only (not exposed to clients)
 - Seed/dev `console.log` in `seed.ts` and startup message in `index.ts` are intentional
 
+---
+
+## Stage 10 — UI Enhancement, Demo Accounts & Final Presentation Polish
+
+### Prompt
+
+Polish UI/UX across all screens, create reusable design system components (PageHeader, ResourceStatusBadge, Spinner, improved Empty/Error/Loading states), mobile drawer navigation, enhanced dashboard with welcome message and role-specific stats, facility card layout, request details layout, admin deactivate confirmations, development demo accounts with upsert seeding, and `docs/demo-accounts.md`.
+
+Commit as: `chore: finalize ui and demo experience`
+
+### What was implemented
+
+- Demo accounts: `demo.user@example.com`, `demo.manager@example.com`, `demo.admin@example.com` (passwords hashed in seed; documented in `docs/demo-accounts.md`)
+- Seed data with realistic facility/area/asset names; upsert for users
+- UI components: `PageHeader`, `Spinner`, `ResourceStatusBadge`, `ApprovalBadge`; enhanced `EmptyState`, `ErrorState`, `LoadingState`
+- Mobile navigation drawer in `AppLayout`; role badge and user meta in header
+- Login/register branding; dev-only demo email shortcuts (no passwords in UI)
+- Facility cards grid; polished access request detail page
+- Admin facility deactivate confirmation modal
+- Frontend navigation tests for USER/MANAGER/ADMIN roles
+
 ### Important design decisions (confirmed at QA)
 
 - **Inactive resource + approved access:** Historical requests preserved; current access excluded when target deactivated
