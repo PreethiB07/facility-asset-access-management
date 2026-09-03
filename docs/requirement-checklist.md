@@ -43,7 +43,8 @@ Status values: **PASS**, **PARTIAL**, **NOT IMPLEMENTED**
 | Authorization (roles) | `requireRole` on privileged routes | PASS | Route files, 403 tests for USER | Frontend checks are UX-only |
 | REST APIs | Express routers under `/api` | PASS | `server/src/app.ts` | Consistent `{ data }` wrapper for resources |
 | PostgreSQL | Prisma datasource | PASS | `schema.prisma` | |
-| Prisma | Models, migrations, seed | PASS | `prisma/migrations/20260903053611_init/` | Single init migration |
+| Prisma | Models, migrations, seed | PASS | Includes `20260903130000_add_multi_company` migration |
+| Multi-company schema | Company + companyId on all tenant entities | PASS | `docs/multi-company-design.md` |
 | Migrations | `prisma migrate dev` / `migrate deploy` | PASS | `npm run db:migrate`, `db:migrate:deploy` | Not run against production in QA |
 | Validation | Zod on all mutating endpoints | PASS | `validators/` directory | |
 | Error handling | AppError + error middleware | PASS | No stack traces in responses | Server logs unexpected errors only |
@@ -115,4 +116,4 @@ Status values: **PASS**, **PARTIAL**, **NOT IMPLEMENTED**
 | No committed `.env` secrets | PASS |
 | Incremental git history (8 feature commits) | PASS |
 
-**Audit date:** Stage 9 final QA
+**Audit date:** Stage 13 multi-company schema

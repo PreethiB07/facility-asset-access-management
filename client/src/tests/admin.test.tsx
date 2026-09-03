@@ -58,6 +58,7 @@ function renderAdminRoute(role: 'USER' | 'MANAGER' | 'ADMIN') {
     email: 'test@example.com',
     role,
     isActive: true,
+    companyId: '00000000-0000-4000-8000-000000000001',
   });
 
   return render(

@@ -37,12 +37,17 @@ export async function createArea(
   facilityId: string,
   input: CreateAreaInput,
 ): Promise<AreaDetail> {
-  await assertFacilityExists(facilityId);
+  const facility = await prisma.facility.findUnique({ where: { id: facilityId } });
+
+  if (!facility) {
+    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
+  }
 
   const area = await prisma.area.create({
     data: {
       ...input,
       facilityId,
+      companyId: facility.companyId,
     },
   });
 

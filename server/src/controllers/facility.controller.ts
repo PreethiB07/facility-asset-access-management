@@ -13,6 +13,7 @@ import {
 } from '../services/facility.service';
 import { AppError } from '../errors/app.error';
 import { ErrorCodes } from '../errors/error-codes';
+import { getCompanyContextFromRequest } from '../utils/company-context';
 
 function parseIdParam(id: string, label: string): string {
   if (!isUuid(id)) {
@@ -62,7 +63,8 @@ export async function createFacilityHandler(
 ): Promise<void> {
   try {
     const input = parseBody(createFacilitySchema, req.body);
-    const facility = await createFacility(input);
+    const { companyId } = getCompanyContextFromRequest(req);
+    const facility = await createFacility(input, companyId);
     sendData(res, facility, 201);
   } catch (error) {
     next(error);

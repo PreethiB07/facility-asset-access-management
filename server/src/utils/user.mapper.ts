@@ -4,6 +4,7 @@ import type { PublicUser } from '../types/auth.types';
 export function toPublicUser(user: User): PublicUser {
   return {
     id: user.id,
+    companyId: user.companyId,
     name: user.name,
     email: user.email,
     role: user.role,

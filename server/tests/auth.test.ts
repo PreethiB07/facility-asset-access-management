@@ -102,7 +102,7 @@ describe('POST /api/auth/register', () => {
     const email = uniqueEmail('hash-check');
     await registerUser({ name: 'Hash User', email, password: VALID_PASSWORD });
 
-    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    const user = await prisma.user.findFirst({ where: { email: email.toLowerCase() } });
     expect(user?.passwordHash).toBeDefined();
     expect(user?.passwordHash).not.toBe(VALID_PASSWORD);
     expect(await bcrypt.compare(VALID_PASSWORD, user!.passwordHash)).toBe(true);

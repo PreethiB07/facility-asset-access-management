@@ -109,6 +109,7 @@ facility-asset-access-management/
     └── requirement-checklist.md
     └── known-issues.md
     └── demo-accounts.md
+    └── multi-company-design.md
 ```
 
 ## Prerequisites
@@ -208,6 +209,8 @@ After seeding, use the accounts documented in [docs/demo-accounts.md](docs/demo-
 | ADMIN | demo.admin@example.com |
 
 Passwords are listed in `docs/demo-accounts.md` only — never in `.env` or the login UI (development mode shows email shortcuts without passwords).
+
+A second tenant (**Globex Industries**) is also seeded for multi-company testing. See [docs/multi-company-design.md](docs/multi-company-design.md).
 
 ```bash
 cd server && npm run db:seed

@@ -8,6 +8,7 @@ export type AccessTargetType = 'FACILITY' | 'AREA' | 'ASSET';
 
 export interface User {
   id: string;
+  companyId: string;
   name: string;
   email: string;
   role: Role;

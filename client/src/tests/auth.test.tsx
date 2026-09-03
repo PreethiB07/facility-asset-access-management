@@ -75,6 +75,7 @@ describe('Authentication', () => {
                   email: 'user@example.com',
                   role: 'USER',
                   isActive: true,
+      companyId: '00000000-0000-4000-8000-000000000001',
                 },
               }),
             100,
@@ -87,6 +88,7 @@ describe('Authentication', () => {
       email: 'user@example.com',
       role: 'USER',
       isActive: true,
+      companyId: '00000000-0000-4000-8000-000000000001',
     });
 
     renderLogin();
@@ -108,6 +110,7 @@ describe('Authentication', () => {
         email: 'user@example.com',
         role: 'USER',
         isActive: true,
+      companyId: '00000000-0000-4000-8000-000000000001',
       },
     });
     vi.mocked(authApi.me).mockResolvedValue({
@@ -116,6 +119,7 @@ describe('Authentication', () => {
       email: 'user@example.com',
       role: 'USER',
       isActive: true,
+      companyId: '00000000-0000-4000-8000-000000000001',
     });
 
     renderLogin();
@@ -155,6 +159,7 @@ describe('Authentication', () => {
       email: 'user@example.com',
       role: 'USER',
       isActive: true,
+      companyId: '00000000-0000-4000-8000-000000000001',
     });
 
     render(

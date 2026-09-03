@@ -46,9 +46,15 @@ export async function getFacilityById(
   };
 }
 
-export async function createFacility(input: CreateFacilityInput): Promise<FacilitySummary> {
+export async function createFacility(
+  input: CreateFacilityInput,
+  companyId: string,
+): Promise<FacilitySummary> {
   const facility = await prisma.facility.create({
-    data: input,
+    data: {
+      ...input,
+      companyId,
+    },
   });
 
   return toFacilitySummary(facility);

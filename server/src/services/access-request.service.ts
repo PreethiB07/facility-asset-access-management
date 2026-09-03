@@ -307,6 +307,15 @@ export async function createAccessRequest(
   requesterId: string,
   input: CreateAccessRequestInput,
 ): Promise<AccessRequestResponse> {
+  const requester = await prisma.user.findUnique({
+    where: { id: requesterId },
+    select: { companyId: true },
+  });
+
+  if (!requester) {
+    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Requester not found');
+  }
+
   const target = await resolveAndValidateTarget(input);
   const now = new Date();
 
@@ -316,6 +325,7 @@ export async function createAccessRequest(
 
   const request = await prisma.accessRequest.create({
     data: {
+      companyId: requester.companyId,
       requesterId,
       facilityId: target.facilityId,
       areaId: target.areaId,

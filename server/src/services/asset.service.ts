@@ -58,8 +58,14 @@ export async function createAsset(input: CreateAssetInput): Promise<AssetSummary
   const areaId = input.areaId ?? null;
   await validateAssetRelationships(input.facilityId, areaId);
 
+  const facility = await prisma.facility.findUnique({ where: { id: input.facilityId } });
+  if (!facility) {
+    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Facility not found');
+  }
+
   const asset = await prisma.asset.create({
     data: {
+      companyId: facility.companyId,
       facilityId: input.facilityId,
       areaId,
       name: input.name,

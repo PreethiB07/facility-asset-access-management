@@ -6,15 +6,16 @@ import { prisma } from '../lib/prisma';
 import type { AuthTokenResponse, LoginInput, PublicUser, RegisterInput } from '../types/auth.types';
 import { signToken } from '../utils/jwt.util';
 import { toPublicUser } from '../utils/user.mapper';
+import { getDefaultRegistrationCompanyId } from './company.service';
+import { findUserByCompanyEmail } from '../utils/user-repository';
 
 const SALT_ROUNDS = 12;
 
 export async function registerUser(input: RegisterInput): Promise<AuthTokenResponse> {
   const normalizedEmail = input.email.toLowerCase();
+  const companyId = await getDefaultRegistrationCompanyId();
 
-  const existingUser = await prisma.user.findUnique({
-    where: { email: normalizedEmail },
-  });
+  const existingUser = await findUserByCompanyEmail(companyId, normalizedEmail);
 
   if (existingUser) {
     throw new AppError(409, ErrorCodes.CONFLICT, 'Email is already registered');
@@ -24,6 +25,7 @@ export async function registerUser(input: RegisterInput): Promise<AuthTokenRespo
 
   const user = await prisma.user.create({
     data: {
+      companyId,
       name: input.name,
       email: normalizedEmail,
       passwordHash,
@@ -43,16 +45,24 @@ export async function registerUser(input: RegisterInput): Promise<AuthTokenRespo
 export async function loginUser(input: LoginInput): Promise<AuthTokenResponse> {
   const normalizedEmail = input.email.toLowerCase();
 
-  const user = await prisma.user.findUnique({
+  const candidates = await prisma.user.findMany({
     where: { email: normalizedEmail },
   });
 
-  if (!user) {
+  if (candidates.length === 0) {
     throw new AppError(401, ErrorCodes.INVALID_CREDENTIALS, 'Invalid email or password');
   }
 
-  const passwordMatches = await bcrypt.compare(input.password, user.passwordHash);
-  if (!passwordMatches) {
+  let user = null;
+  for (const candidate of candidates) {
+    const passwordMatches = await bcrypt.compare(input.password, candidate.passwordHash);
+    if (passwordMatches) {
+      user = candidate;
+      break;
+    }
+  }
+
+  if (!user) {
     throw new AppError(401, ErrorCodes.INVALID_CREDENTIALS, 'Invalid email or password');
   }
 

@@ -24,22 +24,41 @@ enum AccessRequestStatus {
   REJECTED
 }
 
+model Company {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users          User[]
+  facilities     Facility[]
+  areas          Area[]
+  assets         Asset[]
+  accessRequests AccessRequest[]
+}
+
 model User {
   id           String   @id @default(uuid())
+  companyId    String
   name         String
-  email        String   @unique
+  email        String
   passwordHash String
   role         Role     @default(USER)
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
+  company          Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   accessRequests   AccessRequest[] @relation("RequesterAccessRequests")
   approvedRequests AccessRequest[] @relation("ApproverAccessRequests")
+
+  @@unique([companyId, email])
+  @@index([companyId])
 }
 
 model Facility {
   id               String   @id @default(uuid())
+  companyId        String
   name             String
   description      String?
   isActive         Boolean  @default(true)
@@ -47,13 +66,17 @@ model Facility {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   areas          Area[]
   assets         Asset[]
   accessRequests AccessRequest[]
+
+  @@index([companyId])
 }
 
 model Area {
   id               String   @id @default(uuid())
+  companyId        String
   facilityId       String
   name             String
   description      String?
@@ -62,13 +85,18 @@ model Area {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   facility       Facility        @relation(fields: [facilityId], references: [id], onDelete: Restrict)
   assets         Asset[]
   accessRequests AccessRequest[]
+
+  @@index([companyId])
+  @@index([facilityId])
 }
 
 model Asset {
   id               String   @id @default(uuid())
+  companyId        String
   facilityId       String
   areaId           String?
   name             String
@@ -78,13 +106,19 @@ model Asset {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  company        Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
   facility       Facility        @relation(fields: [facilityId], references: [id], onDelete: Restrict)
   area           Area?           @relation(fields: [areaId], references: [id], onDelete: Restrict)
   accessRequests AccessRequest[]
+
+  @@index([companyId])
+  @@index([facilityId])
+  @@index([areaId])
 }
 
 model AccessRequest {
   id              String              @id @default(uuid())
+  companyId       String
   requesterId     String
   facilityId      String?
   areaId          String?
@@ -100,12 +134,14 @@ model AccessRequest {
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
+  company    Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
   requester  User      @relation("RequesterAccessRequests", fields: [requesterId], references: [id], onDelete: Restrict)
   facility   Facility? @relation(fields: [facilityId], references: [id], onDelete: Restrict)
   area       Area?     @relation(fields: [areaId], references: [id], onDelete: Restrict)
   asset      Asset?    @relation(fields: [assetId], references: [id], onDelete: Restrict)
   approvedBy User?     @relation("ApproverAccessRequests", fields: [approvedById], references: [id], onDelete: SetNull)
 
+  @@index([companyId])
   @@index([requesterId])
   @@index([status])
   @@index([facilityId])

@@ -367,3 +367,27 @@ Commit as: `chore: finalize ui and demo experience`
 
 - Large refactors or new features — rejected; focus on correctness and documentation
 - `prisma migrate reset` on shared databases — not run; deploy flow documented instead
+
+---
+
+## Stage 13 — Multi-Company Support: Architecture & Database Schema
+
+### Prompt
+
+Add Company model and companyId to User, Facility, Area, Asset, AccessRequest. Safe migration with legacy Acme Corporation backfill. Database triggers for cross-entity consistency. Two-company seed data. Company context helper. Document RLS planned architecture.
+
+Commit as: `feat: add multi-company data model`
+
+### What was implemented
+
+- `Company` model with unique `name`
+- Per-company email uniqueness (`@@unique([companyId, email])`)
+- Migration `20260903130000_add_multi_company` with backfill + PostgreSQL triggers
+- `getCompanyContext()` in `server/src/utils/company-context.ts`
+- JWT remains `{ userId, role }`; company derived server-side
+- Seed: Acme Corporation + Globex Industries with isolated demo data
+- `docs/multi-company-design.md` with API impact list and test plan
+
+### Next stage
+
+Update REST APIs and authorization for company isolation (tenant-scoped queries).

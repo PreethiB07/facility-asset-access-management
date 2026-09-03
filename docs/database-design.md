@@ -4,13 +4,22 @@ PostgreSQL database layer for the Facility & Asset Access Management Platform, m
 
 ## Entities
 
+### Company
+
+| Field | Type | Notes |
+|-------|------|-------|
+| id | UUID | Primary key |
+| name | String | Unique company name |
+| createdAt / updatedAt | DateTime | Audit timestamps |
+
 ### User
 
 | Field | Type | Notes |
 |-------|------|-------|
 | id | UUID | Primary key |
+| companyId | UUID | Required FK → Company |
 | name | String | Display name |
-| email | String | Unique |
+| email | String | Unique per company (`companyId` + `email`) |
 | passwordHash | String | bcrypt hash only; never plaintext |
 | role | Role enum | `USER`, `MANAGER`, `ADMIN` |
 | isActive | Boolean | Soft-disable without deleting |
@@ -21,6 +30,7 @@ PostgreSQL database layer for the Facility & Asset Access Management Platform, m
 | Field | Type | Notes |
 |-------|------|-------|
 | id | UUID | Primary key |
+| companyId | UUID | Required FK → Company |
 | name | String | |
 | description | String? | Optional |
 | isActive | Boolean | Inactive facilities remain in DB |
@@ -32,6 +42,7 @@ PostgreSQL database layer for the Facility & Asset Access Management Platform, m
 | Field | Type | Notes |
 |-------|------|-------|
 | id | UUID | Primary key |
+| companyId | UUID | Required FK → Company |
 | facilityId | UUID | Required FK → Facility |
 | name | String | |
 | description | String? | |
@@ -44,6 +55,7 @@ PostgreSQL database layer for the Facility & Asset Access Management Platform, m
 | Field | Type | Notes |
 |-------|------|-------|
 | id | UUID | Primary key |
+| companyId | UUID | Required FK → Company |
 | facilityId | UUID | Required FK → Facility |
 | areaId | UUID? | Optional FK → Area |
 | name | String | |
@@ -59,6 +71,7 @@ An asset always belongs to a facility. It may optionally belong to an area withi
 | Field | Type | Notes |
 |-------|------|-------|
 | id | UUID | Primary key |
+| companyId | UUID | Required FK → Company |
 | requesterId | UUID | FK → User |
 | facilityId | UUID? | Exactly one target FK must be set |
 | areaId | UUID? | |
@@ -76,6 +89,8 @@ An asset always belongs to a facility. It may optionally belong to an area withi
 ## Relationships
 
 ```
+Company 1 ──→ many User
+Company 1 ──→ many Facility / Area / Asset / AccessRequest
 User 1 ──→ many AccessRequest (as requester)
 User 1 ──→ many AccessRequest (as approver)
 Facility 1 ──→ many Area
@@ -135,7 +150,12 @@ Inactive resources should be rejected for **new** access requests in a later ser
 
 | Index | Rationale |
 |-------|-----------|
-| `User.email` (unique) | Login lookup |
+| `User.companyId, User.email` (unique) | Per-company login lookup |
+| `User.companyId` | Tenant-scoped user queries |
+| `Facility.companyId` | Tenant-scoped facility queries |
+| `Area.companyId` | Tenant-scoped area queries |
+| `Asset.companyId` | Tenant-scoped asset queries |
+| `AccessRequest.companyId` | Tenant-scoped request queries |
 | `AccessRequest.requesterId` | List requests by user |
 | `AccessRequest.status` | Filter pending/approved/rejected |
 | `AccessRequest.facilityId` | Target-based queries |
@@ -148,19 +168,20 @@ Area and Asset FK columns (`facilityId`, `areaId`) rely on PostgreSQL FK indexes
 
 ## Seed Data
 
-Development seed (`server/prisma/seed.ts`) creates:
+Development seed (`server/prisma/seed.ts`) creates two companies:
 
-- **Users:** Demo Admin, Demo Manager, Demo User (passwords hashed in seed; see `docs/demo-accounts.md`)
-- **Facilities:** Active (requires approval), auto-approve, inactive
-- **Areas:** Area 1, Area 2, inactive area
-- **Assets:** Asset 1–3 in areas, independent facility-level asset, inactive asset
-- **Sample access requests:** facility, area, and asset targets with mixed statuses
+- **Acme Corporation** — `demo.*@example.com` accounts (see `docs/demo-accounts.md`)
+- **Globex Industries** — `globex.*@example.com` accounts
 
-Run: `npm run db:seed` from `server/`.
+Each company receives isolated facilities, areas, assets, and sample access requests.
+
+Run: `npm run db:seed` from `server/` (runs `prisma generate` first when possible).
+
+See [multi-company-design.md](multi-company-design.md) for tenant architecture.
 
 ## Assumptions
 
 - UUID primary keys for all entities
 - PostgreSQL 14+ with `DATABASE_URL` from environment (never hardcoded)
 - Prisma 6.x (stable `url = env("DATABASE_URL")` configuration)
-- Single-database deployment; no multi-tenant schema separation in this stage
+- Multi-company tenancy via `Company` model and `companyId` FKs (Stage 13); API filtering and RLS in later stages

@@ -90,6 +90,7 @@ describe('Manager workflow', () => {
       email: 'current@example.com',
       role: 'USER',
       isActive: true,
+      companyId: '00000000-0000-4000-8000-000000000001',
     });
 
     render(
@@ -115,6 +116,7 @@ describe('Manager workflow', () => {
       email: 'demo.manager@example.com',
       role: 'MANAGER',
       isActive: true,
+      companyId: '00000000-0000-4000-8000-000000000001',
     });
 
     render(
@@ -140,6 +142,7 @@ describe('Manager workflow', () => {
       email: 'demo.admin@example.com',
       role: 'ADMIN',
       isActive: true,
+      companyId: '00000000-0000-4000-8000-000000000001',
     });
 
     render(
