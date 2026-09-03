@@ -23,7 +23,7 @@ export async function submitAccessRequest(
   page: Page,
   input: AccessRequestFormInput,
 ): Promise<void> {
-  await expect(page.getByRole('heading', { name: 'Request Access' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Request Access', exact: true })).toBeVisible();
 
   await setAccessType(page, input.accessType);
   await page.getByRole('main').locator('#startAt').fill(input.startAt);
@@ -39,6 +39,19 @@ export async function submitAccessRequest(
   await page.getByRole('main').locator('#reason').fill(input.reason);
   await page.getByRole('button', { name: 'Submit request' }).click();
 }
+
+export async function submitOnBehalfAccessRequest(
+  page: Page,
+  employeeOptionLabel: string,
+  input: AccessRequestFormInput,
+): Promise<void> {
+  await expect(page.getByRole('heading', { name: 'Request Access', exact: true })).toBeVisible();
+  await page.getByLabel('Beneficiary').selectOption('employee');
+  await page.locator('#employeeSelect').selectOption({ label: employeeOptionLabel });
+  await submitAccessRequest(page, input);
+}
+
+export { setAccessType };
 
 export async function expectAccessRequestSuccess(page: Page): Promise<void> {
   await expect(page.locator('.toast-success')).toContainText(/submitted successfully|approved/i);
