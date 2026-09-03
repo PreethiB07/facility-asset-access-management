@@ -41,6 +41,7 @@ facility-asset-access-management/
 └── docs/
     ├── cursor-prompts.md
     └── database-design.md
+    └── access-request-workflow.md
 ```
 
 ## Prerequisites
@@ -206,6 +207,25 @@ Assets may belong to an area (`areaId` set) or directly to a facility (`areaId =
 |-------|--------|-------------|
 | `active` | `true`, `false` | Filter by active status (admin can omit for all) |
 
+## Access Request APIs
+
+All access request endpoints require JWT authentication. See [docs/access-request-workflow.md](docs/access-request-workflow.md) for full details.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/access-requests` | Create access request (requester from JWT) |
+| GET | `/api/access-requests` | List own requests (`?status=PENDING\|APPROVED\|REJECTED`) |
+| GET | `/api/access-requests/:id` | View own request details |
+| GET | `/api/my-access` | Currently valid approved access |
+
+### Key Rules
+
+- Exactly one target: `facilityId`, `areaId`, or `assetId`
+- Inactive resources reject new requests; history is preserved
+- Auto-approve when `requiresApproval = false`; otherwise `PENDING`
+- Temporary access requires `endAt > startAt`; permanent access has no `endAt`
+- Users can only view their own requests
+
 ## Health Endpoint
 
 ```
@@ -226,8 +246,9 @@ Response:
 2. ~~PostgreSQL + Prisma database setup~~
 3. ~~Authentication (JWT + bcrypt)~~
 4. ~~Facilities, areas, and assets REST APIs~~
-5. Access requests and manager approval workflow
-6. Automated API and business-logic tests
+5. ~~Access request creation workflow~~
+6. Manager approval and rejection workflow
+7. Automated API and business-logic tests
 
 ## Scripts
 

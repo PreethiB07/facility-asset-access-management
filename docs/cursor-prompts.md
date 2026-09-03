@@ -155,3 +155,42 @@ Commit as: `feat: add facility area and asset APIs`
 
 - DELETE endpoints — rejected; deactivation preserves access-request history.
 - MANAGER write access — rejected; only ADMIN per stage requirements.
+
+---
+
+## Stage 5 — Access Request Workflow
+
+### Prompt
+
+Implement access request creation, listing, detail view, and current access endpoints. Support facility/area/asset targets, temporary/permanent access, automatic vs pending approval, inactive resource validation, and comprehensive tests. Manager approval deferred to next stage.
+
+Commit as: `feat: implement access request workflow`
+
+### What was generated
+
+- `server/src/services/access-request.service.ts` — target validation, approval logic, current access
+- `server/src/controllers/access-request.controller.ts`
+- `server/src/routes/access-request.routes.ts`
+- `server/src/validators/access-request.validators.ts` — XOR target + access type rules
+- `server/src/types/access-request.types.ts`
+- `docs/access-request-workflow.md`
+- `server/tests/access-requests.test.ts` — 37 tests
+
+### Review notes
+
+- No Prisma schema changes; existing `AccessRequest` model reused.
+- Requester always from authenticated user; no client-supplied requester ID.
+- Inactive target resources reject new requests; approved history preserved.
+- Deactivated resources exclude access from `/api/my-access` but remain in request history.
+
+### Important design decisions
+
+- **Auto-approval:** `requiresApproval = false` → `APPROVED` with `approvedAt` set, `approvedById = null`.
+- **Permanent + endAt:** rejected at validation (not silently normalized).
+- **Privacy:** other users' requests return 404, not 403.
+- **Current access:** requires target resource still active in addition to time window checks.
+
+### Rejected suggestions
+
+- Normalizing permanent requests by stripping `endAt` — rejected; explicit rejection preferred.
+- Manager viewing all requests in this stage — deferred to approval workflow stage.

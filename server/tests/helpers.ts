@@ -1,5 +1,6 @@
 import request from 'supertest';
 import type { Response } from 'supertest';
+import { expect } from 'vitest';
 import app from '../src/app';
 import { prisma } from '../src/lib/prisma';
 
@@ -67,6 +68,7 @@ export async function cleanupTestResources(): Promise<void> {
   await prisma.accessRequest.deleteMany({
     where: {
       OR: [
+        { reason: { startsWith: TEST_RESOURCE_PREFIX } },
         { facility: { name: { startsWith: TEST_RESOURCE_PREFIX } } },
         { area: { name: { startsWith: TEST_RESOURCE_PREFIX } } },
         { asset: { name: { startsWith: TEST_RESOURCE_PREFIX } } },
