@@ -3,10 +3,11 @@ import request from 'supertest';
 import { Role } from '@prisma/client';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import app from '../src/app';
-import { prisma } from '../src/lib/prisma';
+import { getDb } from '../src/lib/prisma-tenant';
 import { signExpiredToken, signToken } from '../src/utils/jwt.util';
 import {
   authHeader,
+  bootstrapQuery,
   cleanupTestUsers,
   expectNoPasswordHash,
   loginUser,
@@ -102,7 +103,9 @@ describe('POST /api/auth/register', () => {
     const email = uniqueEmail('hash-check');
     await registerUser({ name: 'Hash User', email, password: VALID_PASSWORD });
 
-    const user = await prisma.user.findFirst({ where: { email: email.toLowerCase() } });
+    const user = await bootstrapQuery(() =>
+      getDb().user.findFirst({ where: { email: email.toLowerCase() } }),
+    );
     expect(user?.passwordHash).toBeDefined();
     expect(user?.passwordHash).not.toBe(VALID_PASSWORD);
     expect(await bcrypt.compare(VALID_PASSWORD, user!.passwordHash)).toBe(true);
@@ -174,10 +177,12 @@ describe('POST /api/auth/login', () => {
       password,
     });
 
-    await prisma.user.update({
-      where: { id: created.body.user.id },
-      data: { isActive: false },
-    });
+    await bootstrapQuery(() =>
+      getDb().user.update({
+        where: { id: created.body.user.id },
+        data: { isActive: false },
+      }),
+    );
 
     const response = await loginUser({ email: inactiveEmail, password });
 
@@ -277,10 +282,12 @@ describe('Authentication middleware', () => {
       password: VALID_PASSWORD,
     });
 
-    await prisma.user.update({
-      where: { id: registered.body.user.id },
-      data: { isActive: false },
-    });
+    await bootstrapQuery(() =>
+      getDb().user.update({
+        where: { id: registered.body.user.id },
+        data: { isActive: false },
+      }),
+    );
 
     const response = await request(app)
       .get('/api/auth/protected-test')

@@ -1,9 +1,10 @@
 import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import app from '../src/app';
-import { prisma } from '../src/lib/prisma';
+import { getDb } from '../src/lib/prisma-tenant';
 import {
   authHeader,
+  bootstrapQuery,
   cleanupTestResources,
   getTokenForRole,
   TEST_RESOURCE_PREFIX,
@@ -454,9 +455,11 @@ describe('Resource authorization', () => {
     expect(adminView.status).toBe(200);
     expect(adminView.body.data.isActive).toBe(false);
 
-    const persisted = await prisma.facility.findUnique({
-      where: { id: facility.body.data.id },
-    });
+    const persisted = await bootstrapQuery(() =>
+      getDb().facility.findUnique({
+        where: { id: facility.body.data.id },
+      }),
+    );
     expect(persisted).not.toBeNull();
   });
 });

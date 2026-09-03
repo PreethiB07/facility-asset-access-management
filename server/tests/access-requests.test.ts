@@ -1,9 +1,10 @@
 import request from 'supertest';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import app from '../src/app';
-import { prisma } from '../src/lib/prisma';
+import { getDb } from '../src/lib/prisma-tenant';
 import {
   authHeader,
+  bootstrapQuery,
   cleanupTestResources,
   getTokenForRole,
   registerUser,
@@ -95,10 +96,12 @@ describe('Access request authentication', () => {
       password: VALID_PASSWORD,
     });
 
-    await prisma.user.update({
-      where: { id: registered.body.user.id },
-      data: { isActive: false },
-    });
+    await bootstrapQuery(() =>
+      getDb().user.update({
+        where: { id: registered.body.user.id },
+        data: { isActive: false },
+      }),
+    );
 
     const facilityId = await createFacility(adminToken, 'Inactive User Facility');
     const response = await request(app)
@@ -790,10 +793,12 @@ describe('Current access', () => {
       reason: REASON,
     });
 
-    await prisma.accessRequest.update({
-      where: { id: created.body.data.id },
-      data: { status: 'REJECTED' },
-    });
+    await bootstrapQuery(() =>
+      getDb().accessRequest.update({
+        where: { id: created.body.data.id },
+        data: { status: 'REJECTED' },
+      }),
+    );
 
     const response = await request(app).get('/api/my-access').set(authHeader(userToken));
     expect(response.body.data).toHaveLength(0);

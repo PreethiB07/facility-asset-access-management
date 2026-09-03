@@ -2,21 +2,38 @@ import request from 'supertest';
 import type { Response } from 'supertest';
 import { expect } from 'vitest';
 import app from '../src/app';
-import { prisma } from '../src/lib/prisma';
+import { getDb, runWithSystemBootstrap } from '../src/lib/prisma-tenant';
 
 export const TEST_EMAIL_DOMAIN = '@auth-test.example.com';
+
+/** Run direct Prisma queries that bypass tenant RLS (tests/seed cleanup only). */
+export async function bootstrapQuery<T>(fn: () => Promise<T>): Promise<T> {
+  return runWithSystemBootstrap(fn);
+}
 
 export function uniqueEmail(prefix: string): string {
   return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}${TEST_EMAIL_DOMAIN}`;
 }
 
 export async function cleanupTestUsers(): Promise<void> {
-  await prisma.user.deleteMany({
-    where: {
-      email: {
-        endsWith: TEST_EMAIL_DOMAIN,
+  await runWithSystemBootstrap(async () => {
+    await getDb().accessRequest.deleteMany({
+      where: {
+        requester: {
+          email: {
+            endsWith: TEST_EMAIL_DOMAIN,
+          },
+        },
       },
-    },
+    });
+
+    await getDb().user.deleteMany({
+      where: {
+        email: {
+          endsWith: TEST_EMAIL_DOMAIN,
+        },
+      },
+    });
   });
 }
 
@@ -70,27 +87,29 @@ export async function getGlobexTokenForRole(
 export const TEST_RESOURCE_PREFIX = '__test_resource__';
 
 export async function cleanupTestResources(): Promise<void> {
-  await prisma.accessRequest.deleteMany({
-    where: {
-      OR: [
-        { reason: { startsWith: TEST_RESOURCE_PREFIX } },
-        { facility: { name: { startsWith: TEST_RESOURCE_PREFIX } } },
-        { area: { name: { startsWith: TEST_RESOURCE_PREFIX } } },
-        { asset: { name: { startsWith: TEST_RESOURCE_PREFIX } } },
-      ],
-    },
-  });
+  await runWithSystemBootstrap(async () => {
+    await getDb().accessRequest.deleteMany({
+      where: {
+        OR: [
+          { reason: { startsWith: TEST_RESOURCE_PREFIX } },
+          { facility: { name: { startsWith: TEST_RESOURCE_PREFIX } } },
+          { area: { name: { startsWith: TEST_RESOURCE_PREFIX } } },
+          { asset: { name: { startsWith: TEST_RESOURCE_PREFIX } } },
+        ],
+      },
+    });
 
-  await prisma.asset.deleteMany({
-    where: { name: { startsWith: TEST_RESOURCE_PREFIX } },
-  });
+    await getDb().asset.deleteMany({
+      where: { name: { startsWith: TEST_RESOURCE_PREFIX } },
+    });
 
-  await prisma.area.deleteMany({
-    where: { name: { startsWith: TEST_RESOURCE_PREFIX } },
-  });
+    await getDb().area.deleteMany({
+      where: { name: { startsWith: TEST_RESOURCE_PREFIX } },
+    });
 
-  await prisma.facility.deleteMany({
-    where: { name: { startsWith: TEST_RESOURCE_PREFIX } },
+    await getDb().facility.deleteMany({
+      where: { name: { startsWith: TEST_RESOURCE_PREFIX } },
+    });
   });
 }
 

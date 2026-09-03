@@ -7,6 +7,7 @@ import {
   LEGACY_COMPANY_ID,
 } from '../src/constants/company.constants';
 import { ensureCompany } from '../src/utils/company-seed';
+import { runWithSystemBootstrap } from '../src/lib/prisma-tenant';
 import { upsertUserByCompanyEmail } from '../src/utils/user-repository';
 
 /** Fake challenge-only credentials — Acme Corporation (Company A) */
@@ -73,9 +74,11 @@ async function upsertDemoAccounts(
 }
 
 export async function ensureDemoUsersExist(): Promise<void> {
-  await ensureCompany(LEGACY_COMPANY_ID, ACME_CORPORATION_NAME);
-  await upsertDemoAccounts(LEGACY_COMPANY_ID, DEMO_CREDENTIALS);
+  await runWithSystemBootstrap(async () => {
+    await ensureCompany(LEGACY_COMPANY_ID, ACME_CORPORATION_NAME);
+    await upsertDemoAccounts(LEGACY_COMPANY_ID, DEMO_CREDENTIALS);
 
-  await ensureCompany(GLOBEX_COMPANY_ID, GLOBEX_INDUSTRIES_NAME);
-  await upsertDemoAccounts(GLOBEX_COMPANY_ID, GLOBEX_CREDENTIALS);
+    await ensureCompany(GLOBEX_COMPANY_ID, GLOBEX_INDUSTRIES_NAME);
+    await upsertDemoAccounts(GLOBEX_COMPANY_ID, GLOBEX_CREDENTIALS);
+  });
 }

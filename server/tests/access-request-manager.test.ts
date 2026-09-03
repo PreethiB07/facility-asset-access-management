@@ -1,9 +1,10 @@
 import request from 'supertest';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import app from '../src/app';
-import { prisma } from '../src/lib/prisma';
+import { getDb } from '../src/lib/prisma-tenant';
 import {
   authHeader,
+  bootstrapQuery,
   cleanupTestResources,
   getTokenForRole,
   registerUser,
@@ -253,7 +254,9 @@ describe('Approve access requests', () => {
       .patch(`/api/access-requests/${requestId}/approve`)
       .set(authHeader(managerToken));
 
-    const stored = await prisma.accessRequest.findUnique({ where: { id: requestId } });
+    const stored = await bootstrapQuery(() =>
+      getDb().accessRequest.findUnique({ where: { id: requestId } }),
+    );
     expect(stored?.status).toBe('APPROVED');
   });
 
@@ -408,7 +411,9 @@ describe('Reject access requests', () => {
       .set(authHeader(managerToken))
       .send({ rejectionReason: REJECTION_REASON });
 
-    const stored = await prisma.accessRequest.findUnique({ where: { id: requestId } });
+    const stored = await bootstrapQuery(() =>
+      getDb().accessRequest.findUnique({ where: { id: requestId } }),
+    );
     expect(stored?.status).toBe('REJECTED');
     expect(stored?.rejectionReason).toBe(REJECTION_REASON);
   });
