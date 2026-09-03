@@ -25,17 +25,24 @@ enum AccessRequestStatus {
   REJECTED
 }
 
+enum ApprovalDecision {
+  APPROVED
+  REJECTED
+}
+
 model Company {
   id        String   @id @default(uuid())
   name      String   @unique
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users          User[]
-  facilities     Facility[]
-  areas          Area[]
-  assets         Asset[]
-  accessRequests AccessRequest[]
+  users               User[]
+  facilities          Facility[]
+  areas               Area[]
+  assets              Asset[]
+  accessRequests      AccessRequest[]
+  approvalDelegations ApprovalDelegation[]
+  approvalHistory     ApprovalHistory[]
 }
 
 model User {
@@ -49,9 +56,13 @@ model User {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
-  company          Company         @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  accessRequests   AccessRequest[] @relation("RequesterAccessRequests")
-  approvedRequests AccessRequest[] @relation("ApproverAccessRequests")
+  company                 Company              @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdAccessRequests   AccessRequest[]      @relation("CreatedAccessRequests")
+  requestedForAccessRequests AccessRequest[]   @relation("RequestedForAccessRequests")
+  approvedRequests        AccessRequest[]      @relation("ApproverAccessRequests")
+  delegationsGiven        ApprovalDelegation[] @relation("DelegatingManager")
+  delegationsReceived     ApprovalDelegation[] @relation("DelegatedManager")
+  approvalHistoryActions  ApprovalHistory[]
 
   @@unique([companyId, email])
   @@index([companyId])
@@ -120,7 +131,8 @@ model Asset {
 model AccessRequest {
   id              String              @id @default(uuid())
   companyId       String
-  requesterId     String
+  createdById     String
+  requestedForId  String
   facilityId      String?
   areaId          String?
   assetId         String?
@@ -135,19 +147,60 @@ model AccessRequest {
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
 
-  company    Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
-  requester  User      @relation("RequesterAccessRequests", fields: [requesterId], references: [id], onDelete: Restrict)
-  facility   Facility? @relation(fields: [facilityId], references: [id], onDelete: Restrict)
-  area       Area?     @relation(fields: [areaId], references: [id], onDelete: Restrict)
-  asset      Asset?    @relation(fields: [assetId], references: [id], onDelete: Restrict)
-  approvedBy User?     @relation("ApproverAccessRequests", fields: [approvedById], references: [id], onDelete: SetNull)
+  company      Company           @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdBy    User              @relation("CreatedAccessRequests", fields: [createdById], references: [id], onDelete: Restrict)
+  requestedFor User              @relation("RequestedForAccessRequests", fields: [requestedForId], references: [id], onDelete: Restrict)
+  facility     Facility?         @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  area         Area?             @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  asset        Asset?            @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  approvedBy   User?             @relation("ApproverAccessRequests", fields: [approvedById], references: [id], onDelete: SetNull)
+  approvalHistory ApprovalHistory[]
 
   @@index([companyId])
-  @@index([requesterId])
+  @@index([createdById])
+  @@index([requestedForId])
   @@index([status])
   @@index([facilityId])
   @@index([areaId])
   @@index([assetId])
   @@index([startAt])
   @@index([endAt])
+}
+
+model ApprovalDelegation {
+  id                  String   @id @default(uuid())
+  companyId           String
+  delegatingManagerId String
+  delegatedManagerId  String
+  effectiveFrom       DateTime
+  effectiveUntil      DateTime
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  company           Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  delegatingManager User    @relation("DelegatingManager", fields: [delegatingManagerId], references: [id], onDelete: Restrict)
+  delegatedManager  User    @relation("DelegatedManager", fields: [delegatedManagerId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([delegatingManagerId])
+  @@index([delegatedManagerId])
+  @@index([effectiveFrom, effectiveUntil])
+}
+
+model ApprovalHistory {
+  id              String           @id @default(uuid())
+  companyId       String
+  accessRequestId String
+  actorId         String
+  decision        ApprovalDecision
+  comment         String?
+  createdAt       DateTime         @default(now())
+
+  company       Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  accessRequest AccessRequest @relation(fields: [accessRequestId], references: [id], onDelete: Restrict)
+  actor         User          @relation(fields: [actorId], references: [id], onDelete: Restrict)
+
+  @@index([companyId])
+  @@index([accessRequestId])
+  @@index([actorId])
 }

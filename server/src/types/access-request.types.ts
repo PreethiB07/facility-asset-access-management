@@ -12,6 +12,12 @@ export interface AccessTargetInfo {
   areaName?: string | null;
 }
 
+export interface UserBrief {
+  id: string;
+  name: string;
+  email: string;
+}
+
 export interface AccessRequestResponse {
   id: string;
   accessType: AccessType;
@@ -24,6 +30,8 @@ export interface AccessRequestResponse {
   rejectionReason: string | null;
   createdAt: string;
   updatedAt: string;
+  createdBy: UserBrief;
+  requestedFor: UserBrief;
   target: AccessTargetInfo;
 }
 
@@ -45,12 +53,7 @@ export interface CreateAccessRequestInput {
   startAt: Date;
   endAt: Date | null;
   reason: string;
-}
-
-export interface RequesterInfo {
-  id: string;
-  name: string;
-  email: string;
+  requestedForId?: string;
 }
 
 export interface ApproverInfo {
@@ -66,8 +69,10 @@ export interface PendingAccessRequestResponse {
   reason: string;
   status: AccessRequestStatus;
   createdAt: string;
-  requester: RequesterInfo;
+  createdBy: UserBrief;
+  requestedFor: UserBrief;
   target: AccessTargetInfo;
+  canApprove: boolean;
 }
 
 export interface ManagerActionResponse {
@@ -76,4 +81,11 @@ export interface ManagerActionResponse {
   approvedAt: string | null;
   approvedBy: ApproverInfo | null;
   rejectionReason: string | null;
+}
+
+export interface EmployeeSummary {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
 }

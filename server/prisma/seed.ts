@@ -182,7 +182,8 @@ async function seedCompanyData(
     data: [
       {
         companyId,
-        requesterId: user.id,
+        createdById: user.id,
+        requestedForId: user.id,
         facilityId: mainOperations.id,
         accessType: AccessType.TEMPORARY,
         startAt: now,
@@ -192,7 +193,8 @@ async function seedCompanyData(
       },
       {
         companyId,
-        requesterId: user.id,
+        createdById: user.id,
+        requestedForId: user.id,
         areaId: serverRoom.id,
         accessType: AccessType.PERMANENT,
         startAt: now,
@@ -204,7 +206,8 @@ async function seedCompanyData(
       },
       {
         companyId,
-        requesterId: user.id,
+        createdById: user.id,
+        requestedForId: user.id,
         assetId: generator.id,
         accessType: AccessType.TEMPORARY,
         startAt: now,

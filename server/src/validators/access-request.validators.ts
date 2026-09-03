@@ -19,6 +19,7 @@ export const createAccessRequestSchema = z
     startAt: z.string().datetime({ message: 'startAt must be a valid ISO datetime' }),
     endAt: z.string().datetime({ message: 'endAt must be a valid ISO datetime' }).optional().nullable(),
     reason: reasonSchema,
+    requestedForId: z.string().uuid('requestedForId must be a valid UUID').optional(),
   })
   .superRefine((data, ctx) => {
     const targetCount = [data.facilityId, data.areaId, data.assetId].filter(Boolean).length;

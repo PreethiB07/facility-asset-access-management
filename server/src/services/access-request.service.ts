@@ -1,6 +1,8 @@
 import {
   AccessRequestStatus,
   AccessType,
+  ApprovalDecision,
+  Role,
   type AccessRequest,
   type Area,
   type Asset,
@@ -16,9 +18,12 @@ import type {
   ApproverInfo,
   CreateAccessRequestInput,
   CurrentAccessResponse,
+  EmployeeSummary,
   ManagerActionResponse,
   PendingAccessRequestResponse,
+  UserBrief,
 } from '../types/access-request.types';
+import { hasActiveDelegationAsDelegate } from './delegation.service';
 
 type AccessRequestWithRelations = AccessRequest & {
   facility: Facility | null;
@@ -26,10 +31,13 @@ type AccessRequestWithRelations = AccessRequest & {
   asset: (Asset & { facility: Facility; area: Area | null }) | null;
 };
 
-type AccessRequestWithRequester = AccessRequestWithRelations & {
-  requester: { id: string; name: string; email: string };
+type AccessRequestWithUsers = AccessRequestWithRelations & {
+  createdBy: { id: string; name: string; email: string };
+  requestedFor: { id: string; name: string; email: string };
   approvedBy: { id: string; name: string } | null;
 };
+
+const userSelect = { id: true, name: true, email: true } as const;
 
 const accessRequestInclude = {
   facility: true,
@@ -37,14 +45,23 @@ const accessRequestInclude = {
   asset: { include: { facility: true, area: true } },
 } satisfies Prisma.AccessRequestInclude;
 
-const managerAccessRequestInclude = {
+const accessRequestWithUsersInclude = {
   ...accessRequestInclude,
-  requester: { select: { id: true, name: true, email: true } },
+  createdBy: { select: userSelect },
+  requestedFor: { select: userSelect },
+} satisfies Prisma.AccessRequestInclude;
+
+const managerAccessRequestInclude = {
+  ...accessRequestWithUsersInclude,
   approvedBy: { select: { id: true, name: true } },
 } satisfies Prisma.AccessRequestInclude;
 
 function toIsoString(date: Date): string {
   return date.toISOString();
+}
+
+function toUserBrief(user: { id: string; name: string; email: string }): UserBrief {
+  return { id: user.id, name: user.name, email: user.email };
 }
 
 function buildTargetInfo(request: AccessRequestWithRelations): AccessTargetInfo {
@@ -85,7 +102,7 @@ function buildTargetInfo(request: AccessRequestWithRelations): AccessTargetInfo 
   throw new AppError(500, ErrorCodes.INTERNAL_ERROR, 'Access request target could not be resolved');
 }
 
-function toAccessRequestResponse(request: AccessRequestWithRelations): AccessRequestResponse {
+function toAccessRequestResponse(request: AccessRequestWithUsers): AccessRequestResponse {
   return {
     id: request.id,
     accessType: request.accessType,
@@ -98,6 +115,8 @@ function toAccessRequestResponse(request: AccessRequestWithRelations): AccessReq
     rejectionReason: request.rejectionReason,
     createdAt: toIsoString(request.createdAt),
     updatedAt: toIsoString(request.updatedAt),
+    createdBy: toUserBrief(request.createdBy),
+    requestedFor: toUserBrief(request.requestedFor),
     target: buildTargetInfo(request),
   };
 }
@@ -123,7 +142,7 @@ interface ResolvedTarget {
 
 async function resolveAndValidateTarget(
   input: CreateAccessRequestInput,
-  companyId: string,
+  _companyId: string,
 ): Promise<ResolvedTarget> {
   if (input.facilityId) {
     const facility = await getDb().facility.findFirst({
@@ -191,6 +210,42 @@ async function resolveAndValidateTarget(
   }
 
   throw new AppError(400, ErrorCodes.VALIDATION_ERROR, 'Exactly one target must be provided');
+}
+
+async function resolveRequestedForId(
+  createdById: string,
+  requestedForId: string | undefined,
+  role: Role,
+  companyId: string,
+): Promise<string> {
+  const beneficiaryId = requestedForId ?? createdById;
+
+  if (beneficiaryId === createdById) {
+    return createdById;
+  }
+
+  if (role !== Role.MANAGER && role !== Role.ADMIN) {
+    throw new AppError(
+      403,
+      ErrorCodes.FORBIDDEN,
+      'Only managers can create access requests on behalf of employees',
+    );
+  }
+
+  const employee = await getDb().user.findFirst({
+    where: { id: beneficiaryId },
+    select: { id: true, companyId: true, isActive: true },
+  });
+
+  if (!employee || employee.companyId !== companyId) {
+    throw new AppError(404, ErrorCodes.NOT_FOUND, 'Employee not found');
+  }
+
+  if (!employee.isActive) {
+    throw new AppError(400, ErrorCodes.VALIDATION_ERROR, 'Employee account is inactive');
+  }
+
+  return employee.id;
 }
 
 function isTargetResourceActive(request: AccessRequestWithRelations): boolean {
@@ -265,7 +320,31 @@ function toApproverInfo(user: { id: string; name: string } | null): ApproverInfo
   return { id: user.id, name: user.name };
 }
 
-function toManagerActionResponse(request: AccessRequestWithRequester): ManagerActionResponse {
+function toPendingAccessRequestResponse(
+  request: AccessRequestWithUsers,
+  viewerId: string,
+  viewerRole: Role,
+): PendingAccessRequestResponse {
+  const canApprove =
+    (viewerRole === Role.MANAGER || viewerRole === Role.ADMIN) &&
+    request.createdById !== viewerId;
+
+  return {
+    id: request.id,
+    accessType: request.accessType,
+    startAt: toIsoString(request.startAt),
+    endAt: request.endAt ? toIsoString(request.endAt) : null,
+    reason: request.reason,
+    status: request.status,
+    createdAt: toIsoString(request.createdAt),
+    createdBy: toUserBrief(request.createdBy),
+    requestedFor: toUserBrief(request.requestedFor),
+    target: buildTargetInfo(request),
+    canApprove,
+  };
+}
+
+function toManagerActionResponse(request: AccessRequestWithUsers): ManagerActionResponse {
   return {
     id: request.id,
     status: request.status,
@@ -275,27 +354,7 @@ function toManagerActionResponse(request: AccessRequestWithRequester): ManagerAc
   };
 }
 
-function toPendingAccessRequestResponse(
-  request: AccessRequestWithRequester,
-): PendingAccessRequestResponse {
-  return {
-    id: request.id,
-    accessType: request.accessType,
-    startAt: toIsoString(request.startAt),
-    endAt: request.endAt ? toIsoString(request.endAt) : null,
-    reason: request.reason,
-    status: request.status,
-    createdAt: toIsoString(request.createdAt),
-    requester: {
-      id: request.requester.id,
-      name: request.requester.name,
-      email: request.requester.email,
-    },
-    target: buildTargetInfo(request),
-  };
-}
-
-async function loadManagerRequest(requestId: string): Promise<AccessRequestWithRequester> {
+async function loadManagerRequest(requestId: string): Promise<AccessRequestWithUsers> {
   const request = await getDb().accessRequest.findFirst({
     where: { id: requestId },
     include: managerAccessRequestInclude,
@@ -305,24 +364,66 @@ async function loadManagerRequest(requestId: string): Promise<AccessRequestWithR
     throw new AppError(404, ErrorCodes.NOT_FOUND, 'Access request not found');
   }
 
-  return request as AccessRequestWithRequester;
+  return request as AccessRequestWithUsers;
+}
+
+async function assertCanApproveOrReject(
+  request: AccessRequestWithUsers,
+  approverId: string,
+  approverRole: Role,
+  companyId: string,
+  now: Date,
+): Promise<void> {
+  if (request.createdById === approverId) {
+    throw new AppError(
+      403,
+      ErrorCodes.FORBIDDEN,
+      'You cannot approve or reject an access request you created',
+    );
+  }
+
+  if (approverRole !== Role.MANAGER && approverRole !== Role.ADMIN) {
+    throw new AppError(403, ErrorCodes.FORBIDDEN, 'Not authorized to action this request');
+  }
+
+  const hasManagerAuthority =
+    approverRole === Role.ADMIN ||
+    approverRole === Role.MANAGER ||
+    (await hasActiveDelegationAsDelegate(approverId, companyId, now));
+
+  if (!hasManagerAuthority) {
+    throw new AppError(403, ErrorCodes.FORBIDDEN, 'Not authorized to action this request');
+  }
+}
+
+function visibilityFilter(userId: string): Prisma.AccessRequestWhereInput {
+  return {
+    OR: [{ requestedForId: userId }, { createdById: userId }],
+  };
 }
 
 export async function createAccessRequest(
-  requesterId: string,
+  createdById: string,
   input: CreateAccessRequestInput,
   companyId: string,
+  role: Role,
 ): Promise<AccessRequestResponse> {
   return runWithCompanyContext(companyId, async () => {
-    const requester = await getDb().user.findFirst({
-      where: { id: requesterId },
+    const creator = await getDb().user.findFirst({
+      where: { id: createdById },
       select: { id: true },
     });
 
-    if (!requester) {
-      throw new AppError(404, ErrorCodes.NOT_FOUND, 'Requester not found');
+    if (!creator) {
+      throw new AppError(404, ErrorCodes.NOT_FOUND, 'User not found');
     }
 
+    const requestedForId = await resolveRequestedForId(
+      createdById,
+      input.requestedForId,
+      role,
+      companyId,
+    );
     const target = await resolveAndValidateTarget(input, companyId);
     const now = new Date();
 
@@ -333,7 +434,8 @@ export async function createAccessRequest(
     const request = await getDb().accessRequest.create({
       data: {
         companyId,
-        requesterId,
+        createdById,
+        requestedForId,
         facilityId: target.facilityId,
         areaId: target.areaId,
         assetId: target.assetId,
@@ -345,60 +447,63 @@ export async function createAccessRequest(
         approvedAt: status === AccessRequestStatus.APPROVED ? now : null,
         approvedById: null,
       },
-      include: accessRequestInclude,
+      include: accessRequestWithUsersInclude,
     });
 
-    return toAccessRequestResponse(request);
+    return toAccessRequestResponse(request as AccessRequestWithUsers);
   });
 }
 
 export async function listMyAccessRequests(
-  requesterId: string,
+  userId: string,
   companyId: string,
   status?: AccessRequestStatus,
 ): Promise<AccessRequestResponse[]> {
   return runWithCompanyContext(companyId, async () => {
     const requests = await getDb().accessRequest.findMany({
       where: {
-        requesterId,
+        ...visibilityFilter(userId),
         ...(status ? { status } : {}),
       },
-      include: accessRequestInclude,
+      include: accessRequestWithUsersInclude,
       orderBy: { createdAt: 'desc' },
     });
 
-    return requests.map(toAccessRequestResponse);
+    return requests.map((request) => toAccessRequestResponse(request as AccessRequestWithUsers));
   });
 }
 
 export async function getAccessRequestById(
   requestId: string,
-  requesterId: string,
+  userId: string,
   companyId: string,
 ): Promise<AccessRequestResponse> {
   return runWithCompanyContext(companyId, async () => {
     const request = await getDb().accessRequest.findFirst({
-      where: { id: requestId, requesterId },
-      include: accessRequestInclude,
+      where: {
+        id: requestId,
+        ...visibilityFilter(userId),
+      },
+      include: accessRequestWithUsersInclude,
     });
 
     if (!request) {
       throw new AppError(404, ErrorCodes.NOT_FOUND, 'Access request not found');
     }
 
-    return toAccessRequestResponse(request);
+    return toAccessRequestResponse(request as AccessRequestWithUsers);
   });
 }
 
 export async function getCurrentAccess(
-  requesterId: string,
+  userId: string,
   companyId: string,
   now: Date = new Date(),
 ): Promise<CurrentAccessResponse[]> {
   return runWithCompanyContext(companyId, async () => {
     const requests = await getDb().accessRequest.findMany({
       where: {
-        requesterId,
+        requestedForId: userId,
         status: AccessRequestStatus.APPROVED,
         startAt: { lte: now },
         OR: [
@@ -422,6 +527,25 @@ export async function getCurrentAccess(
   });
 }
 
+export async function listCompanyEmployees(
+  companyId: string,
+): Promise<EmployeeSummary[]> {
+  return runWithCompanyContext(companyId, async () => {
+    const users = await getDb().user.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, name: true, email: true, role: true },
+      orderBy: { name: 'asc' },
+    });
+
+    return users.map((user) => ({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    }));
+  });
+}
+
 export function mapCreateBodyToInput(body: {
   facilityId?: string;
   areaId?: string;
@@ -430,6 +554,7 @@ export function mapCreateBodyToInput(body: {
   startAt: string;
   endAt?: string | null;
   reason: string;
+  requestedForId?: string;
 }): CreateAccessRequestInput {
   return {
     facilityId: body.facilityId,
@@ -444,11 +569,14 @@ export function mapCreateBodyToInput(body: {
           ? new Date(body.endAt)
           : null,
     reason: body.reason.trim(),
+    requestedForId: body.requestedForId,
   };
 }
 
 export async function listPendingAccessRequests(
   companyId: string,
+  viewerId: string,
+  viewerRole: Role,
 ): Promise<PendingAccessRequestResponse[]> {
   return runWithCompanyContext(companyId, async () => {
     const requests = await getDb().accessRequest.findMany({
@@ -458,7 +586,7 @@ export async function listPendingAccessRequests(
     });
 
     return requests.map((request) =>
-      toPendingAccessRequestResponse(request as AccessRequestWithRequester),
+      toPendingAccessRequestResponse(request as AccessRequestWithUsers, viewerId, viewerRole),
     );
   });
 }
@@ -466,16 +594,19 @@ export async function listPendingAccessRequests(
 export async function approveAccessRequest(
   requestId: string,
   approverId: string,
+  approverRole: Role,
   companyId: string,
   now: Date = new Date(),
 ): Promise<ManagerActionResponse> {
   return runWithCompanyContext(companyId, async () => {
     const request = await loadManagerRequest(requestId);
     assertPendingStatus(request.status);
+    await assertCanApproveOrReject(request, approverId, approverRole, companyId, now);
     validateTargetEligibleForApproval(request);
     validateAccessPeriodForApproval(request, now);
 
-    const updateResult = await getDb().accessRequest.updateMany({
+    const db = getDb();
+    const updateResult = await db.accessRequest.updateMany({
       where: {
         id: requestId,
         status: AccessRequestStatus.PENDING,
@@ -492,9 +623,19 @@ export async function approveAccessRequest(
       throw new AppError(
         409,
         ErrorCodes.CONFLICT,
-        'Access request is no longer pending',
+        'This request has already been processed by another manager',
       );
     }
+
+    await db.approvalHistory.create({
+      data: {
+        companyId,
+        accessRequestId: requestId,
+        actorId: approverId,
+        decision: ApprovalDecision.APPROVED,
+        comment: null,
+      },
+    });
 
     const updated = await loadManagerRequest(requestId);
     return toManagerActionResponse(updated);
@@ -504,6 +645,7 @@ export async function approveAccessRequest(
 export async function rejectAccessRequest(
   requestId: string,
   approverId: string,
+  approverRole: Role,
   rejectionReason: string,
   companyId: string,
   now: Date = new Date(),
@@ -511,8 +653,12 @@ export async function rejectAccessRequest(
   return runWithCompanyContext(companyId, async () => {
     const request = await loadManagerRequest(requestId);
     assertPendingStatus(request.status);
+    await assertCanApproveOrReject(request, approverId, approverRole, companyId, now);
 
-    const updateResult = await getDb().accessRequest.updateMany({
+    const trimmedReason = rejectionReason.trim();
+    const db = getDb();
+
+    const updateResult = await db.accessRequest.updateMany({
       where: {
         id: requestId,
         status: AccessRequestStatus.PENDING,
@@ -521,7 +667,7 @@ export async function rejectAccessRequest(
         status: AccessRequestStatus.REJECTED,
         approvedById: approverId,
         approvedAt: now,
-        rejectionReason: rejectionReason.trim(),
+        rejectionReason: trimmedReason,
       },
     });
 
@@ -529,9 +675,19 @@ export async function rejectAccessRequest(
       throw new AppError(
         409,
         ErrorCodes.CONFLICT,
-        'Access request is no longer pending',
+        'This request has already been processed by another manager',
       );
     }
+
+    await db.approvalHistory.create({
+      data: {
+        companyId,
+        accessRequestId: requestId,
+        actorId: approverId,
+        decision: ApprovalDecision.REJECTED,
+        comment: trimmedReason,
+      },
+    });
 
     const updated = await loadManagerRequest(requestId);
     return toManagerActionResponse(updated);

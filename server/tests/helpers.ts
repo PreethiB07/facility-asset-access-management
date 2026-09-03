@@ -17,9 +17,55 @@ export function uniqueEmail(prefix: string): string {
 
 export async function cleanupTestUsers(): Promise<void> {
   await runWithSystemBootstrap(async () => {
+    await getDb().approvalHistory.deleteMany({
+      where: {
+        OR: [
+          {
+            accessRequest: {
+              createdBy: {
+                email: {
+                  endsWith: TEST_EMAIL_DOMAIN,
+                },
+              },
+            },
+          },
+          {
+            accessRequest: {
+              requestedFor: {
+                email: {
+                  endsWith: TEST_EMAIL_DOMAIN,
+                },
+              },
+            },
+          },
+        ],
+      },
+    });
+
     await getDb().accessRequest.deleteMany({
       where: {
-        requester: {
+        OR: [
+          {
+            createdBy: {
+              email: {
+                endsWith: TEST_EMAIL_DOMAIN,
+              },
+            },
+          },
+          {
+            requestedFor: {
+              email: {
+                endsWith: TEST_EMAIL_DOMAIN,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    await getDb().approvalDelegation.deleteMany({
+      where: {
+        delegatingManager: {
           email: {
             endsWith: TEST_EMAIL_DOMAIN,
           },
@@ -88,6 +134,17 @@ export const TEST_RESOURCE_PREFIX = '__test_resource__';
 
 export async function cleanupTestResources(): Promise<void> {
   await runWithSystemBootstrap(async () => {
+    await getDb().approvalHistory.deleteMany({
+      where: {
+        OR: [
+          { accessRequest: { reason: { startsWith: TEST_RESOURCE_PREFIX } } },
+          { accessRequest: { facility: { name: { startsWith: TEST_RESOURCE_PREFIX } } } },
+          { accessRequest: { area: { name: { startsWith: TEST_RESOURCE_PREFIX } } } },
+          { accessRequest: { asset: { name: { startsWith: TEST_RESOURCE_PREFIX } } } },
+        ],
+      },
+    });
+
     await getDb().accessRequest.deleteMany({
       where: {
         OR: [

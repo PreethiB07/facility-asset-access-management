@@ -2,8 +2,10 @@ import express from 'express';
 import cors from 'cors';
 import {
   accessRequestRouter,
+  employeeRouter,
   myAccessRouter,
 } from './routes/access-request.routes';
+import delegationRoutes from './routes/delegation.routes';
 import areaRoutes from './routes/area.routes';
 import assetRoutes from './routes/asset.routes';
 import authRoutes from './routes/auth.routes';
@@ -22,6 +24,8 @@ app.use('/api/areas', areaRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/access-requests', accessRequestRouter);
 app.use('/api/my-access', myAccessRouter);
+app.use('/api/employees', employeeRouter);
+app.use('/api/delegations', delegationRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
