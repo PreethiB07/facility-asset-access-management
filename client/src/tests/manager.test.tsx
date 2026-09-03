@@ -105,6 +105,57 @@ describe('Manager workflow', () => {
     });
 
     expect(screen.queryByRole('link', { name: /pending approvals/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /administration/i })).not.toBeInTheDocument();
+  });
+
+  it('MANAGER sees pending approvals in navigation', async () => {
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: 'manager-user',
+      name: 'Demo Manager',
+      email: 'demo.manager@example.com',
+      role: 'MANAGER',
+      isActive: true,
+    });
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AppLayout />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Demo Manager/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('link', { name: /pending approvals/i })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /administration/i })).not.toBeInTheDocument();
+  });
+
+  it('ADMIN sees administration in navigation', async () => {
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: 'admin-user',
+      name: 'Demo Admin',
+      email: 'demo.admin@example.com',
+      role: 'ADMIN',
+      isActive: true,
+    });
+
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <AppLayout />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText(/Demo Admin/i)).toBeInTheDocument();
+    });
+
+    expect(screen.getByRole('link', { name: /pending approvals/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /administration/i })).toBeInTheDocument();
   });
 
   it('approval confirmation is shown before approving', async () => {
@@ -175,7 +226,7 @@ describe('Manager workflow', () => {
     const dialog = screen.getByRole('dialog');
     await user.click(within(dialog).getByRole('button', { name: /^approve$/i }));
 
-    expect(await screen.findByText('Access has been approved.')).toBeInTheDocument();
+    expect(await screen.findByText('Access request approved.')).toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByText('Maintenance window')).not.toBeInTheDocument();
     });

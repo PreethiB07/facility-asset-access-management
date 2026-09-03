@@ -41,7 +41,7 @@ export default function ManagerRequestsPage() {
     try {
       await accessRequestApi.approve(id);
       setRequests((prev) => prev.filter((request) => request.id !== id));
-      showSuccess('Access has been approved.');
+      showSuccess('Access request approved.');
       setConfirmApproveId(null);
     } catch (err) {
       showError(getErrorMessage(err));
@@ -55,7 +55,7 @@ export default function ManagerRequestsPage() {
       await accessRequestApi.reject(id, rejectionReason);
       setRequests((prev) => prev.filter((request) => request.id !== id));
       setRejectingId(null);
-      showSuccess('Access request has been rejected.');
+      showSuccess('Access request rejected.');
     } catch (err) {
       throw err;
     }
@@ -75,7 +75,10 @@ export default function ManagerRequestsPage() {
       <p className="text-muted page-intro">Review and action access requests awaiting approval.</p>
 
       {requests.length === 0 ? (
-        <EmptyState message="There are no pending approval requests." />
+        <EmptyState
+          title="No Pending Approvals"
+          message="There are currently no access requests waiting for your review."
+        />
       ) : (
         <>
           <div className="table-wrapper desktop-only">

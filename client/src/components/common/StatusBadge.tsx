@@ -11,5 +11,9 @@ const STATUS_CLASS: Record<AccessRequestStatus, string> = {
 };
 
 export default function StatusBadge({ status }: StatusBadgeProps) {
-  return <span className={`badge ${STATUS_CLASS[status]}`}>{status}</span>;
+  return (
+    <span className={`badge ${STATUS_CLASS[status]}`} aria-label={`Status: ${status}`}>
+      {status}
+    </span>
+  );
 }

@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import ApprovalHelpText from '../common/ApprovalHelpText';
+import ConfirmModal from '../common/ConfirmModal';
+import EmptyState from '../common/EmptyState';
 import ErrorState from '../common/ErrorState';
 import LoadingState from '../common/LoadingState';
+import ResourceStatusBadge from '../common/ResourceStatusBadge';
 import { useToast } from '../../context/ToastContext';
 import { facilityApi, type FacilityPayload } from '../../services/facility.service';
 import { getErrorMessage } from '../../utils/errors';
@@ -32,6 +35,7 @@ export default function FacilityAdminPanel() {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [togglingId, setTogglingId] = useState<string | null>(null);
+  const [confirmDeactivate, setConfirmDeactivate] = useState<Facility | null>(null);
 
   const loadFacilities = useCallback(async () => {
     setLoading(true);
@@ -72,7 +76,7 @@ export default function FacilityAdminPanel() {
   function validate(): Record<string, string> {
     const errors: Record<string, string> = {};
     if (!form.name.trim()) {
-      errors.name = 'Name is required';
+      errors.name = 'Facility name is required.';
     }
     return errors;
   }
@@ -136,12 +140,17 @@ export default function FacilityAdminPanel() {
       <div className="panel-header">
         <h2>Facilities</h2>
         <button type="button" className="btn btn-primary btn-sm" onClick={openCreate}>
-          Create facility
+          + Add Facility
         </button>
       </div>
 
       {facilities.length === 0 ? (
-        <p className="text-muted">No facilities found. Create one to get started.</p>
+        <EmptyState
+          title="No Facilities"
+          message="Create your first facility to get started."
+          actionLabel="Add Facility"
+          onAction={openCreate}
+        />
       ) : (
         <>
           <div className="table-wrapper desktop-only">
@@ -160,7 +169,9 @@ export default function FacilityAdminPanel() {
                   <tr key={facility.id}>
                     <td>{facility.name}</td>
                     <td>{facility.description ?? '—'}</td>
-                    <td>{facility.isActive ? 'Active' : 'Inactive'}</td>
+                    <td>
+                      <ResourceStatusBadge active={facility.isActive} />
+                    </td>
                     <td>{facility.requiresApproval ? 'Required' : 'Automatic'}</td>
                     <td className="actions-cell">
                       <button
@@ -173,7 +184,11 @@ export default function FacilityAdminPanel() {
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
-                        onClick={() => void toggleActive(facility)}
+                        onClick={() =>
+                          facility.isActive
+                            ? setConfirmDeactivate(facility)
+                            : void toggleActive(facility)
+                        }
                         disabled={togglingId === facility.id}
                       >
                         {togglingId === facility.id
@@ -212,7 +227,9 @@ export default function FacilityAdminPanel() {
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
-                    onClick={() => void toggleActive(facility)}
+                    onClick={() =>
+                      facility.isActive ? setConfirmDeactivate(facility) : void toggleActive(facility)
+                    }
                     disabled={togglingId === facility.id}
                   >
                     {facility.isActive ? 'Deactivate' : 'Activate'}
@@ -222,6 +239,21 @@ export default function FacilityAdminPanel() {
             ))}
           </div>
         </>
+      )}
+
+      {confirmDeactivate && (
+        <ConfirmModal
+          title={`Deactivate ${confirmDeactivate.name}?`}
+          message="Existing historical access requests will be retained."
+          confirmLabel="Deactivate"
+          loadingLabel="Deactivating..."
+          loading={togglingId === confirmDeactivate.id}
+          onCancel={() => setConfirmDeactivate(null)}
+          onConfirm={async () => {
+            await toggleActive(confirmDeactivate);
+            setConfirmDeactivate(null);
+          }}
+        />
       )}
 
       {formOpen && (

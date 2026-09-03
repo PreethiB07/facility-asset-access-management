@@ -42,7 +42,8 @@ export default function MyAccessPage() {
       <div className="page">
         <h1>My Current Access</h1>
         <EmptyState
-          message="You currently have no active access."
+          title="No Current Access"
+          message="You currently have no active approved access."
           actionLabel="Browse Facilities"
           actionTo="/facilities"
         />

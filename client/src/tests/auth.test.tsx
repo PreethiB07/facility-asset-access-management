@@ -56,8 +56,8 @@ describe('Authentication', () => {
 
     await user.click(screen.getByRole('button', { name: /login/i }));
 
-    expect(await screen.findByText('Email is required')).toBeInTheDocument();
-    expect(screen.getByText('Password is required')).toBeInTheDocument();
+    expect(await screen.findByText('Email is required.')).toBeInTheDocument();
+    expect(screen.getByText('Password is required.')).toBeInTheDocument();
   });
 
   it('loading state works', async () => {

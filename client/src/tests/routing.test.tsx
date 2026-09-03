@@ -84,7 +84,7 @@ describe('Routing', () => {
       </MemoryRouter>,
     );
 
-    expect(await screen.findByRole('heading', { name: /dashboard/i })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: /welcome back, test user/i })).toBeInTheDocument();
   });
 });
 

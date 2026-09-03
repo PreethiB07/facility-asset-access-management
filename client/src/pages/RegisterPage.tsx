@@ -84,8 +84,15 @@ export default function RegisterPage() {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Create account</h1>
-        <p className="text-muted">Register as a standard user account</p>
+        <div className="auth-brand">
+          <span className="brand-mark brand-mark-lg" aria-hidden="true">
+            FA
+          </span>
+          <div>
+            <h1>Create account</h1>
+            <p className="text-muted">Register as a standard user account</p>
+          </div>
+        </div>
 
         {error && (
           <div className="alert alert-error" role="alert">

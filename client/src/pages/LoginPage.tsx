@@ -5,6 +5,12 @@ import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/errors';
 import { isValidEmail } from '../utils/validation';
 
+const DEMO_ACCOUNTS = [
+  { role: 'USER', email: 'demo.user@example.com' },
+  { role: 'MANAGER', email: 'demo.manager@example.com' },
+  { role: 'ADMIN', email: 'demo.admin@example.com' },
+] as const;
+
 export default function LoginPage() {
   const { login, isAuthenticated, loading } = useAuth();
   const navigate = useNavigate();
@@ -27,12 +33,12 @@ export default function LoginPage() {
 
     const errors: { email?: string; password?: string } = {};
     if (!email.trim()) {
-      errors.email = 'Email is required';
+      errors.email = 'Email is required.';
     } else if (!isValidEmail(email)) {
       errors.email = 'Please enter a valid email address.';
     }
     if (!password) {
-      errors.password = 'Password is required';
+      errors.password = 'Password is required.';
     }
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) {
@@ -44,17 +50,31 @@ export default function LoginPage() {
       await login(email.trim(), password);
       navigate(from, { replace: true });
     } catch (err) {
-      setError(getErrorMessage(err, 'Unable to sign in. Please try again.'));
+      setError(getErrorMessage(err, 'Unable to sign in. Please check your credentials and try again.'));
     } finally {
       setSubmitting(false);
     }
   }
 
+  function fillDemoEmail(demoEmail: string) {
+    setEmail(demoEmail);
+    setFieldErrors({});
+    setError('');
+  }
+
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <h1>Sign in</h1>
-        <p className="text-muted">Access your facility and asset permissions</p>
+        <div className="auth-brand">
+          <span className="brand-mark brand-mark-lg" aria-hidden="true">
+            FA
+          </span>
+          <div>
+            <p className="auth-app-name">Facility Access</p>
+            <h1>Sign in</h1>
+            <p className="text-muted">Access your facility and asset permissions</p>
+          </div>
+        </div>
 
         {error && (
           <div className="alert alert-error" role="alert">
@@ -97,6 +117,27 @@ export default function LoginPage() {
         <p className="auth-footer">
           Don&apos;t have an account? <Link to="/register">Register</Link>
         </p>
+
+        {import.meta.env.DEV && (
+          <aside className="demo-accounts-hint" aria-label="Development demo accounts">
+            <h2>Demo Accounts</h2>
+            <p className="text-muted">Development only — see docs/demo-accounts.md for passwords.</p>
+            <ul className="demo-account-list">
+              {DEMO_ACCOUNTS.map((account) => (
+                <li key={account.role}>
+                  <button
+                    type="button"
+                    className="demo-account-btn"
+                    onClick={() => fillDemoEmail(account.email)}
+                  >
+                    <span className="role-badge role-badge-sm">{account.role}</span>
+                    {account.email}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </aside>
+        )}
       </div>
     </div>
   );

@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import AccessRequestForm from '../components/access/AccessRequestForm';
+import ApprovalBadge from '../components/common/ApprovalBadge';
 import ErrorState from '../components/common/ErrorState';
 import LoadingState from '../components/common/LoadingState';
+import PageHeader from '../components/common/PageHeader';
+import ResourceStatusBadge from '../components/common/ResourceStatusBadge';
 import { assetApi } from '../services/asset.service';
 import { facilityApi } from '../services/facility.service';
 import { getErrorMessage } from '../utils/errors';
@@ -50,7 +53,14 @@ export default function FacilityDetailPage() {
   }
 
   if (error || !facility) {
-    return <ErrorState message={error || 'The requested facility could not be found.'} />;
+    return (
+      <ErrorState
+        title="Not Found"
+        message={error || 'The requested facility could not be found.'}
+        backTo="/facilities"
+        backLabel="Back to Facilities"
+      />
+    );
   }
 
   return (
@@ -61,18 +71,11 @@ export default function FacilityDetailPage() {
         <span>{facility.name}</span>
       </nav>
 
-      <h1>{facility.name}</h1>
-      <p className="text-muted">{facility.description ?? 'No description provided.'}</p>
+      <PageHeader title={facility.name} description={facility.description ?? 'No description provided.'} />
 
-      <div className="info-grid">
-        <div className="info-item">
-          <span className="info-label">Status</span>
-          <span>{facility.isActive ? 'Active' : 'Inactive'}</span>
-        </div>
-        <div className="info-item">
-          <span className="info-label">Approval</span>
-          <span>{facility.requiresApproval ? 'Required' : 'Automatic'}</span>
-        </div>
+      <div className="badge-row">
+        <ResourceStatusBadge active={facility.isActive} />
+        <ApprovalBadge requiresApproval={facility.requiresApproval} />
       </div>
 
       <AccessRequestForm
@@ -111,7 +114,10 @@ export default function FacilityDetailPage() {
       </section>
 
       <section className="card">
-        <h2>Independent Facility Assets</h2>
+        <h2>Independent Assets</h2>
+        <p className="section-help text-muted">
+          These assets belong directly to the facility and are not assigned to an area.
+        </p>
         {independentAssets.length === 0 ? (
           <p className="text-muted">No independent facility assets.</p>
         ) : (

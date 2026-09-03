@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import EmptyState from '../components/common/EmptyState';
 import ErrorState from '../components/common/ErrorState';
 import LoadingState from '../components/common/LoadingState';
+import PageHeader from '../components/common/PageHeader';
 import StatusBadge from '../components/common/StatusBadge';
 import { accessRequestApi } from '../services/accessRequest.service';
 import { formatAccessPeriod, formatDateTime } from '../utils/dates';
@@ -17,10 +18,19 @@ const STATUS_OPTIONS: Array<{ label: string; value: AccessRequestStatus | '' }> 
 ];
 
 export default function AccessRequestsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialStatus = (searchParams.get('status') as AccessRequestStatus | null) ?? '';
   const [requests, setRequests] = useState<AccessRequest[]>([]);
-  const [statusFilter, setStatusFilter] = useState<AccessRequestStatus | ''>('');
+  const [statusFilter, setStatusFilter] = useState<AccessRequestStatus | ''>(initialStatus);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const paramStatus = searchParams.get('status') as AccessRequestStatus | null;
+    if (paramStatus && paramStatus !== statusFilter) {
+      setStatusFilter(paramStatus);
+    }
+  }, [searchParams, statusFilter]);
 
   useEffect(() => {
     async function loadRequests() {
@@ -39,6 +49,15 @@ export default function AccessRequestsPage() {
     void loadRequests();
   }, [statusFilter]);
 
+  function handleStatusChange(value: AccessRequestStatus | '') {
+    setStatusFilter(value);
+    if (value) {
+      setSearchParams({ status: value });
+    } else {
+      setSearchParams({});
+    }
+  }
+
   if (loading) {
     return <LoadingState message="Loading requests..." />;
   }
@@ -49,14 +68,14 @@ export default function AccessRequestsPage() {
 
   return (
     <div className="page">
-      <h1>My Access Requests</h1>
+      <PageHeader title="My Access Requests" description="Track submitted access requests and their status." />
 
       <div className="filter-row">
         <label htmlFor="statusFilter">Filter by status</label>
         <select
           id="statusFilter"
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value as AccessRequestStatus | '')}
+          onChange={(e) => handleStatusChange(e.target.value as AccessRequestStatus | '')}
         >
           {STATUS_OPTIONS.map((option) => (
             <option key={option.label} value={option.value}>
@@ -68,6 +87,7 @@ export default function AccessRequestsPage() {
 
       {requests.length === 0 ? (
         <EmptyState
+          title="No Access Requests"
           message="You haven't submitted any access requests yet."
           actionLabel="Browse Facilities"
           actionTo="/facilities"
