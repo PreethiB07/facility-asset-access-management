@@ -411,3 +411,23 @@ Enforce company isolation on all REST endpoints. Cross-company access returns 40
 ### Next stage
 
 Implement PostgreSQL Row-Level Security.
+
+---
+
+## Stage 15 — PostgreSQL Row-Level Security (RLS)
+
+### Prompt
+
+Add database-level company isolation via PostgreSQL RLS, transaction-local session context, `faam_app` runtime role, and direct SQL isolation tests.
+
+### What was implemented
+
+- Migration `20260903140000_enable_rls` with `app` schema helpers and RLS policies
+- `server/src/lib/prisma-tenant.ts` — `runWithCompanyContext`, `SET LOCAL` via `set_config`
+- `DATABASE_URL` → `faam_app`; `DATABASE_DIRECT_URL` → `postgres` for migrations
+- `docs/rls-architecture.md`
+- `tests/rls-isolation.test.ts` — unfiltered SQL tests, INSERT/UPDATE/DELETE matrix
+
+### Next stage
+
+Full regression testing, migration verification, and multi-company end-to-end testing.

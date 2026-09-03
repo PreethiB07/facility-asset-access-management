@@ -131,7 +131,8 @@ cp client/.env.example client/.env
 
 | Variable | Description |
 |----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_URL` | PostgreSQL connection string for **`faam_app`** runtime role (subject to RLS) |
+| `DATABASE_DIRECT_URL` | Elevated connection for migrations (`postgres` superuser) |
 | `JWT_SECRET` | Secret for signing JWT tokens |
 | `JWT_EXPIRES_IN` | Token lifetime (default: `24h`) |
 | `PORT` | Backend server port (default: `3001`) |
