@@ -1,9 +1,10 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter } from 'react-router-dom';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import LoginPage from '../pages/LoginPage';
+import RegisterPage from '../pages/RegisterPage';
 import { authApi } from '../services/auth.service';
 
 vi.mock('../services/auth.service', () => ({
@@ -23,11 +24,14 @@ vi.mock('../services/api', () => ({
   setUnauthorizedHandler: vi.fn(),
 }));
 
-function renderLogin() {
+function renderLogin(initialEntry = '/login') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <AuthProvider>
-        <LoginPage />
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/dashboard" element={<div>Dashboard page</div>} />
+        </Routes>
       </AuthProvider>
     </MemoryRouter>,
   );
@@ -36,12 +40,13 @@ function renderLogin() {
 describe('Authentication', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.mocked(authApi.getStoredToken).mockReturnValue(null);
   });
 
   it('login form renders', () => {
     renderLogin();
-    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /login/i })).toBeInTheDocument();
   });
 
@@ -55,7 +60,45 @@ describe('Authentication', () => {
     expect(screen.getByText('Password is required')).toBeInTheDocument();
   });
 
-  it('successful login updates auth state', async () => {
+  it('loading state works', async () => {
+    const user = userEvent.setup();
+    vi.mocked(authApi.login).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(
+            () =>
+              resolve({
+                token: 'test-token',
+                user: {
+                  id: '1',
+                  name: 'Test User',
+                  email: 'user@example.com',
+                  role: 'USER',
+                  isActive: true,
+                },
+              }),
+            100,
+          );
+        }),
+    );
+    vi.mocked(authApi.me).mockResolvedValue({
+      id: '1',
+      name: 'Test User',
+      email: 'user@example.com',
+      role: 'USER',
+      isActive: true,
+    });
+
+    renderLogin();
+
+    await user.type(screen.getByLabelText(/^email/i), 'user@example.com');
+    await user.type(screen.getByLabelText(/^password/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /login/i }));
+
+    expect(screen.getByRole('button', { name: /signing in/i })).toBeDisabled();
+  });
+
+  it('successful login redirects', async () => {
     const user = userEvent.setup();
     vi.mocked(authApi.login).mockResolvedValue({
       token: 'test-token',
@@ -77,17 +120,14 @@ describe('Authentication', () => {
 
     renderLogin();
 
-    await user.type(screen.getByLabelText(/email/i), 'user@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.type(screen.getByLabelText(/^email/i), 'user@example.com');
+    await user.type(screen.getByLabelText(/^password/i), 'password123');
     await user.click(screen.getByRole('button', { name: /login/i }));
 
-    await waitFor(() => {
-      expect(authApi.login).toHaveBeenCalledWith('user@example.com', 'password123');
-      expect(authApi.saveToken).toHaveBeenCalledWith('test-token');
-    });
+    expect(await screen.findByText('Dashboard page')).toBeInTheDocument();
   });
 
-  it('failed login displays error', async () => {
+  it('failed login displays safe message', async () => {
     const user = userEvent.setup();
     vi.mocked(authApi.login).mockRejectedValue({
       isAxiosError: true,
@@ -100,8 +140,8 @@ describe('Authentication', () => {
 
     renderLogin();
 
-    await user.type(screen.getByLabelText(/email/i), 'user@example.com');
-    await user.type(screen.getByLabelText(/password/i), 'wrong');
+    await user.type(screen.getByLabelText(/^email/i), 'user@example.com');
+    await user.type(screen.getByLabelText(/^password/i), 'wrong');
     await user.click(screen.getByRole('button', { name: /login/i }));
 
     expect(await screen.findByText('Invalid email or password')).toBeInTheDocument();
@@ -135,6 +175,60 @@ describe('Authentication', () => {
       expect(authApi.clearToken).toHaveBeenCalled();
       expect(screen.getByText('guest')).toBeInTheDocument();
     });
+  });
+});
+
+describe('Registration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(authApi.getStoredToken).mockReturnValue(null);
+  });
+
+  it('password confirmation validation', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <RegisterPage />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    await user.type(await screen.findByLabelText(/^name/i), 'Test User');
+    await user.type(screen.getByLabelText(/^email/i), 'user@example.com');
+    await user.type(screen.getByLabelText(/^password/i), 'password123');
+    await user.type(screen.getByLabelText(/^confirm password/i), 'different');
+    await user.click(screen.getByRole('button', { name: /register/i }));
+
+    expect(await screen.findByText('Passwords do not match')).toBeInTheDocument();
+  });
+
+  it('role cannot be selected', () => {
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <RegisterPage />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    expect(screen.queryByLabelText(/role/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/admin/i)).not.toBeInTheDocument();
+  });
+
+  it('password visibility works', async () => {
+    const user = userEvent.setup();
+    render(
+      <MemoryRouter>
+        <AuthProvider>
+          <RegisterPage />
+        </AuthProvider>
+      </MemoryRouter>,
+    );
+
+    const showButtons = await screen.findAllByRole('button', { name: /show password/i });
+    await user.click(showButtons[0]);
+    expect(screen.getByLabelText(/^password/i)).toHaveAttribute('type', 'text');
   });
 });
 

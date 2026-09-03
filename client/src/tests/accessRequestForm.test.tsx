@@ -2,6 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import AccessRequestForm from '../components/access/AccessRequestForm';
+import { ToastProvider } from '../context/ToastContext';
 import { accessRequestApi } from '../services/accessRequest.service';
 
 vi.mock('../services/accessRequest.service', () => ({
@@ -14,7 +15,16 @@ const target = {
   type: 'ASSET' as const,
   assetId: 'asset-1',
   name: 'Server Rack A',
+  facilityName: 'Main Campus',
 };
+
+function renderForm() {
+  return render(
+    <ToastProvider>
+      <AccessRequestForm target={target} />
+    </ToastProvider>,
+  );
+}
 
 describe('Access request form', () => {
   beforeEach(() => {
@@ -22,18 +32,19 @@ describe('Access request form', () => {
   });
 
   it('request form renders', () => {
-    render(<AccessRequestForm target={target} />);
+    renderForm();
     expect(screen.getByLabelText(/access type/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/start date/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/reason/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/why do you need access/i)).toBeInTheDocument();
+    expect(screen.getByText(/access target/i)).toBeInTheDocument();
   });
 
   it('temporary access requires end date', async () => {
     const user = userEvent.setup();
-    render(<AccessRequestForm target={target} />);
+    renderForm();
 
     await user.selectOptions(screen.getByLabelText(/access type/i), 'TEMPORARY');
-    await user.type(screen.getByLabelText(/reason/i), 'Need access for maintenance');
+    await user.type(screen.getByLabelText(/why do you need access/i), 'Need access for maintenance');
     await user.click(screen.getByRole('button', { name: /submit request/i }));
 
     expect(
@@ -43,24 +54,73 @@ describe('Access request form', () => {
 
   it('permanent access hides end date field', async () => {
     const user = userEvent.setup();
-    render(<AccessRequestForm target={target} />);
+    renderForm();
 
     await user.selectOptions(screen.getByLabelText(/access type/i), 'PERMANENT');
 
     expect(screen.queryByLabelText(/end date/i)).not.toBeInTheDocument();
   });
 
+  it('invalid date range rejected', async () => {
+    const user = userEvent.setup();
+    renderForm();
+
+    await user.selectOptions(screen.getByLabelText(/access type/i), 'TEMPORARY');
+    await user.type(screen.getByLabelText(/start date/i), '2030-06-01T10:00');
+    await user.type(screen.getByLabelText(/end date/i), '2030-06-01T09:00');
+    await user.type(screen.getByLabelText(/why do you need access/i), 'Maintenance');
+    await user.click(screen.getByRole('button', { name: /submit request/i }));
+
+    expect(await screen.findByText('End date must be after the start date')).toBeInTheDocument();
+  });
+
   it('empty reason is rejected', async () => {
     const user = userEvent.setup();
-    render(<AccessRequestForm target={target} />);
+    renderForm();
 
     await user.selectOptions(screen.getByLabelText(/access type/i), 'PERMANENT');
     await user.click(screen.getByRole('button', { name: /submit request/i }));
 
-    expect(await screen.findByText('Reason is required')).toBeInTheDocument();
+    expect(await screen.findByText('Please provide a reason for this request')).toBeInTheDocument();
   });
 
-  it('successful request displays correct result for auto-approved access', async () => {
+  it('submission loading state', async () => {
+    const user = userEvent.setup();
+    vi.mocked(accessRequestApi.create).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(
+            () =>
+              resolve({
+                id: 'req-1',
+                accessType: 'PERMANENT',
+                startAt: new Date().toISOString(),
+                endAt: null,
+                reason: 'Project work',
+                status: 'APPROVED',
+                approvedAt: new Date().toISOString(),
+                approvedById: null,
+                rejectionReason: null,
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString(),
+                target: { type: 'ASSET', id: 'asset-1', name: 'Server Rack A' },
+              }),
+            100,
+          );
+        }),
+    );
+
+    renderForm();
+
+    await user.selectOptions(screen.getByLabelText(/access type/i), 'PERMANENT');
+    await user.type(screen.getByLabelText(/start date/i), '2030-01-01T09:00');
+    await user.type(screen.getByLabelText(/why do you need access/i), 'Project work');
+    await user.click(screen.getByRole('button', { name: /submit request/i }));
+
+    expect(screen.getByRole('button', { name: /submitting/i })).toBeDisabled();
+  });
+
+  it('successful submission feedback for auto-approved access', async () => {
     const user = userEvent.setup();
     vi.mocked(accessRequestApi.create).mockResolvedValue({
       id: 'req-1',
@@ -74,52 +134,17 @@ describe('Access request form', () => {
       rejectionReason: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      target: {
-        type: 'ASSET',
-        id: 'asset-1',
-        name: 'Server Rack A',
-      },
+      target: { type: 'ASSET', id: 'asset-1', name: 'Server Rack A' },
     });
 
-    render(<AccessRequestForm target={target} />);
+    renderForm();
 
     await user.selectOptions(screen.getByLabelText(/access type/i), 'PERMANENT');
     await user.type(screen.getByLabelText(/start date/i), '2030-01-01T09:00');
-    await user.type(screen.getByLabelText(/reason/i), 'Project work');
+    await user.type(screen.getByLabelText(/why do you need access/i), 'Project work');
     await user.click(screen.getByRole('button', { name: /submit request/i }));
 
-    expect(await screen.findByText('Access approved')).toBeInTheDocument();
-  });
-
-  it('successful request displays pending message', async () => {
-    const user = userEvent.setup();
-    vi.mocked(accessRequestApi.create).mockResolvedValue({
-      id: 'req-2',
-      accessType: 'PERMANENT',
-      startAt: new Date().toISOString(),
-      endAt: null,
-      reason: 'Need approval',
-      status: 'PENDING',
-      approvedAt: null,
-      approvedById: null,
-      rejectionReason: null,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      target: {
-        type: 'ASSET',
-        id: 'asset-1',
-        name: 'Server Rack A',
-      },
-    });
-
-    render(<AccessRequestForm target={target} />);
-
-    await user.selectOptions(screen.getByLabelText(/access type/i), 'PERMANENT');
-    await user.type(screen.getByLabelText(/start date/i), '2030-01-01T09:00');
-    await user.type(screen.getByLabelText(/reason/i), 'Need approval');
-    await user.click(screen.getByRole('button', { name: /submit request/i }));
-
-    expect(await screen.findByText('Access request submitted for approval')).toBeInTheDocument();
+    expect(await screen.findByText('Access has been approved.')).toBeInTheDocument();
   });
 
   it('API error is displayed', async () => {
@@ -132,11 +157,11 @@ describe('Access request form', () => {
       },
     });
 
-    render(<AccessRequestForm target={target} />);
+    renderForm();
 
     await user.selectOptions(screen.getByLabelText(/access type/i), 'PERMANENT');
     await user.type(screen.getByLabelText(/start date/i), '2030-01-01T09:00');
-    await user.type(screen.getByLabelText(/reason/i), 'Need access');
+    await user.type(screen.getByLabelText(/why do you need access/i), 'Need access');
     await user.click(screen.getByRole('button', { name: /submit request/i }));
 
     expect(await screen.findByText('Target requires approval')).toBeInTheDocument();
@@ -159,11 +184,11 @@ describe('Access request form', () => {
       target: { type: 'ASSET', id: 'asset-1', name: 'Server Rack A' },
     });
 
-    render(<AccessRequestForm target={target} />);
+    renderForm();
 
     await user.selectOptions(screen.getByLabelText(/access type/i), 'PERMANENT');
     await user.type(screen.getByLabelText(/start date/i), '2030-01-01T09:00');
-    await user.type(screen.getByLabelText(/reason/i), 'Long term');
+    await user.type(screen.getByLabelText(/why do you need access/i), 'Long term');
     await user.click(screen.getByRole('button', { name: /submit request/i }));
 
     await waitFor(() => {

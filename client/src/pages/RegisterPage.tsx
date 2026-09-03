@@ -1,7 +1,13 @@
 import { useState, type FormEvent } from 'react';
 import { Link, Navigate } from 'react-router-dom';
+import PasswordInput from '../components/common/PasswordInput';
 import { useAuth } from '../context/AuthContext';
 import { getErrorMessage } from '../utils/errors';
+import {
+  isValidEmail,
+  PASSWORD_REQUIREMENTS,
+  validatePassword,
+} from '../utils/validation';
 
 export default function RegisterPage() {
   const { register, isAuthenticated, loading } = useAuth();
@@ -25,12 +31,15 @@ export default function RegisterPage() {
     }
     if (!email.trim()) {
       errors.email = 'Email is required';
-    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-      errors.email = 'Enter a valid email address';
+    } else if (!isValidEmail(email)) {
+      errors.email = 'Please enter a valid email address.';
     }
-    if (!password) {
-      errors.password = 'Password is required';
+
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      errors.password = passwordError;
     }
+
     if (password !== confirmPassword) {
       errors.confirmPassword = 'Passwords do not match';
     }
@@ -76,54 +85,64 @@ export default function RegisterPage() {
     <div className="auth-page">
       <div className="auth-card">
         <h1>Create account</h1>
-        <p className="text-muted">Register as a standard user</p>
+        <p className="text-muted">Register as a standard user account</p>
 
-        {error && <div className="alert alert-error">{error}</div>}
+        {error && (
+          <div className="alert alert-error" role="alert">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} noValidate>
           <div className="form-group">
-            <label htmlFor="name">Name</label>
-            <input id="name" type="text" value={name} onChange={(e) => setName(e.target.value)} />
+            <label htmlFor="name">
+              Name <span className="required-indicator">*</span>
+            </label>
+            <input
+              id="name"
+              type="text"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="Your full name"
+            />
             {fieldErrors.name && <span className="field-error">{fieldErrors.name}</span>}
           </div>
 
           <div className="form-group">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">
+              Email <span className="required-indicator">*</span>
+            </label>
             <input
               id="email"
               type="email"
               autoComplete="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
             />
             {fieldErrors.email && <span className="field-error">{fieldErrors.email}</span>}
           </div>
 
-          <div className="form-group">
-            <label htmlFor="password">Password</label>
-            <input
-              id="password"
-              type="password"
-              autoComplete="new-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-            />
-            {fieldErrors.password && <span className="field-error">{fieldErrors.password}</span>}
-          </div>
+          <PasswordInput
+            id="password"
+            label="Password"
+            required
+            autoComplete="new-password"
+            value={password}
+            onChange={setPassword}
+            error={fieldErrors.password}
+            hint={PASSWORD_REQUIREMENTS}
+          />
 
-          <div className="form-group">
-            <label htmlFor="confirmPassword">Confirm password</label>
-            <input
-              id="confirmPassword"
-              type="password"
-              autoComplete="new-password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-            />
-            {fieldErrors.confirmPassword && (
-              <span className="field-error">{fieldErrors.confirmPassword}</span>
-            )}
-          </div>
+          <PasswordInput
+            id="confirmPassword"
+            label="Confirm password"
+            required
+            autoComplete="new-password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            error={fieldErrors.confirmPassword}
+          />
 
           <button type="submit" className="btn btn-primary btn-block" disabled={submitting}>
             {submitting ? 'Creating account...' : 'Register'}

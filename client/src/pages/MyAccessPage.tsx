@@ -41,7 +41,11 @@ export default function MyAccessPage() {
     return (
       <div className="page">
         <h1>My Current Access</h1>
-        <EmptyState message="You currently have no active access." />
+        <EmptyState
+          message="You currently have no active access."
+          actionLabel="Browse Facilities"
+          actionTo="/facilities"
+        />
       </div>
     );
   }
@@ -73,7 +77,7 @@ export default function MyAccessPage() {
                 <td>{access.target.areaName ?? '—'}</td>
                 <td>{access.accessType}</td>
                 <td>{formatDateTime(access.startAt)}</td>
-                <td>{formatValidUntil(access.accessType, access.endAt)}</td>
+                <td>{formatValidUntil(access.accessType, access.startAt, access.endAt)}</td>
               </tr>
             ))}
           </tbody>

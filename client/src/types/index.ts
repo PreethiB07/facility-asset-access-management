@@ -129,4 +129,6 @@ export interface AccessRequestTarget {
   areaId?: string;
   assetId?: string;
   name: string;
+  facilityName?: string;
+  areaName?: string | null;
 }

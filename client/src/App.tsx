@@ -12,6 +12,7 @@ import LoginPage from './pages/LoginPage';
 import ManagerRequestsPage from './pages/ManagerRequestsPage';
 import MyAccessPage from './pages/MyAccessPage';
 import RegisterPage from './pages/RegisterPage';
+import AdminRoute from './routes/AdminRoute';
 import ManagerRoute from './routes/ManagerRoute';
 import ProtectedRoute from './routes/ProtectedRoute';
 
@@ -36,7 +37,9 @@ function App() {
             <Route path="/manager/requests" element={<ManagerRequestsPage />} />
           </Route>
 
-          <Route path="/admin" element={<AdminPage />} />
+          <Route element={<AdminRoute />}>
+            <Route path="/admin" element={<AdminPage />} />
+          </Route>
         </Route>
       </Route>
 

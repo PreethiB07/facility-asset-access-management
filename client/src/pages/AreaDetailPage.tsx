@@ -4,6 +4,7 @@ import AccessRequestForm from '../components/access/AccessRequestForm';
 import ErrorState from '../components/common/ErrorState';
 import LoadingState from '../components/common/LoadingState';
 import { areaApi } from '../services/area.service';
+import { facilityApi } from '../services/facility.service';
 import { getErrorMessage } from '../utils/errors';
 import type { AreaDetail, Asset } from '../types';
 
@@ -13,6 +14,7 @@ export default function AreaDetailPage() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [facilityName, setFacilityName] = useState('');
 
   useEffect(() => {
     if (!id) {
@@ -25,12 +27,14 @@ export default function AreaDetailPage() {
       setLoading(true);
       setError('');
       try {
-        const [areaData, areaAssets] = await Promise.all([
-          areaApi.getById(areaId),
+        const areaData = await areaApi.getById(areaId);
+        const [areaAssets, facilityData] = await Promise.all([
           areaApi.listAssets(areaId),
+          facilityApi.getById(areaData.facilityId),
         ]);
         setArea(areaData);
         setAssets(areaAssets);
+        setFacilityName(facilityData.name);
       } catch (err) {
         setError(getErrorMessage(err, 'The requested area could not be found.'));
       } finally {
@@ -42,7 +46,7 @@ export default function AreaDetailPage() {
   }, [id]);
 
   if (loading) {
-    return <LoadingState message="Loading area..." />;
+    return <LoadingState message="Loading area details..." />;
   }
 
   if (error || !area) {
@@ -77,7 +81,15 @@ export default function AreaDetailPage() {
         </div>
       </div>
 
-      <AccessRequestForm target={{ type: 'AREA', areaId: area.id, name: area.name }} />
+      <AccessRequestForm
+        target={{
+          type: 'AREA',
+          areaId: area.id,
+          facilityId: area.facilityId,
+          name: area.name,
+          facilityName,
+        }}
+      />
 
       <section className="card">
         <h2>Assets in this area</h2>

@@ -4,6 +4,8 @@ import AccessRequestForm from '../components/access/AccessRequestForm';
 import ErrorState from '../components/common/ErrorState';
 import LoadingState from '../components/common/LoadingState';
 import { assetApi } from '../services/asset.service';
+import { areaApi } from '../services/area.service';
+import { facilityApi } from '../services/facility.service';
 import { getErrorMessage } from '../utils/errors';
 import type { Asset } from '../types';
 
@@ -12,6 +14,8 @@ export default function AssetDetailPage() {
   const [asset, setAsset] = useState<Asset | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [facilityName, setFacilityName] = useState('');
+  const [areaName, setAreaName] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -25,7 +29,15 @@ export default function AssetDetailPage() {
       setError('');
       try {
         const data = await assetApi.getById(assetId);
+        const facilityData = await facilityApi.getById(data.facilityId);
         setAsset(data);
+        setFacilityName(facilityData.name);
+        if (data.areaId) {
+          const areaData = await areaApi.getById(data.areaId);
+          setAreaName(areaData.name);
+        } else {
+          setAreaName(null);
+        }
       } catch (err) {
         setError(getErrorMessage(err, 'The requested asset could not be found.'));
       } finally {
@@ -37,7 +49,7 @@ export default function AssetDetailPage() {
   }, [id]);
 
   if (loading) {
-    return <LoadingState message="Loading asset..." />;
+    return <LoadingState message="Loading asset details..." />;
   }
 
   if (error || !asset) {
@@ -86,7 +98,16 @@ export default function AssetDetailPage() {
         </div>
       </div>
 
-      <AccessRequestForm target={{ type: 'ASSET', assetId: asset.id, name: asset.name }} />
+      <AccessRequestForm
+        target={{
+          type: 'ASSET',
+          assetId: asset.id,
+          facilityId: asset.facilityId,
+          name: asset.name,
+          facilityName,
+          areaName,
+        }}
+      />
     </div>
   );
 }

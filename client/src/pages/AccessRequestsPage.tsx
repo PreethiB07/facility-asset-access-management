@@ -67,7 +67,11 @@ export default function AccessRequestsPage() {
       </div>
 
       {requests.length === 0 ? (
-        <EmptyState message="You have not submitted any access requests." />
+        <EmptyState
+          message="You haven't submitted any access requests yet."
+          actionLabel="Browse Facilities"
+          actionTo="/facilities"
+        />
       ) : (
         <div className="table-wrapper">
           <table className="data-table">

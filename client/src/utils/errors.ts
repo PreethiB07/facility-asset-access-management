@@ -6,7 +6,7 @@ export function getErrorMessage(
 ): string {
   if (axios.isAxiosError(error)) {
     if (!error.response) {
-      return 'Network error. Please check your connection and try again.';
+      return 'Unable to connect to the server. Please try again.';
     }
 
     const data = error.response.data as { error?: { message?: string } } | undefined;
@@ -18,7 +18,7 @@ export function getErrorMessage(
       case 401:
         return 'Invalid email or password.';
       case 403:
-        return 'You are not authorized to perform this action.';
+        return 'You do not have permission to perform this action.';
       case 404:
         return 'The requested resource could not be found.';
       case 409:

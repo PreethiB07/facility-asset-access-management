@@ -41,7 +41,7 @@ export default function FacilitiesPage() {
     return (
       <div className="page">
         <h1>Facilities</h1>
-        <EmptyState message="No facilities available." />
+        <EmptyState message="No facilities are available." />
       </div>
     );
   }

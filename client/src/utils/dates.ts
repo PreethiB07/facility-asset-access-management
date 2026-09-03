@@ -1,9 +1,21 @@
+const DATE_TIME_OPTIONS: Intl.DateTimeFormatOptions = {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+  hour: 'numeric',
+  minute: '2-digit',
+};
+
 export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString();
+  return new Date(iso).toLocaleString(undefined, DATE_TIME_OPTIONS);
 }
 
 export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString();
+  return new Date(iso).toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 export function toDatetimeLocalValue(iso: string): string {
@@ -23,19 +35,18 @@ export function formatAccessPeriod(
   endAt: string | null,
 ): string {
   if (accessType === 'PERMANENT') {
-    return `Permanent (from ${formatDateTime(startAt)})`;
+    return `From ${formatDateTime(startAt)} — Permanent`;
   }
-  return endAt
-    ? `${formatDateTime(startAt)} – ${formatDateTime(endAt)}`
-    : formatDateTime(startAt);
+  return endAt ? `${formatDateTime(startAt)} to ${formatDateTime(endAt)}` : formatDateTime(startAt);
 }
 
 export function formatValidUntil(
   accessType: 'TEMPORARY' | 'PERMANENT',
+  startAt: string,
   endAt: string | null,
 ): string {
   if (accessType === 'PERMANENT') {
-    return 'Permanent';
+    return `From ${formatDate(startAt)} — Permanent`;
   }
   return endAt ? `Valid until ${formatDateTime(endAt)}` : 'Temporary';
 }

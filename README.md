@@ -138,7 +138,7 @@ The React frontend consumes the existing REST APIs. Business rules and authoriza
 | `/access-requests/:id` | Yes | Own request details |
 | `/my-access` | Yes | Currently valid approved access |
 | `/manager/requests` | Manager/Admin | Pending approvals with approve/reject |
-| `/admin` | Admin (nav) | Administration placeholder (Stage 8) |
+| `/admin` | Admin only | Manage facilities, areas, and assets |
 
 Unauthenticated users attempting protected routes are redirected to `/login`.
 
@@ -184,6 +184,41 @@ Service modules:
 - `accessRequest.service.ts` — access requests, my access, manager actions
 
 Base URL: `import.meta.env.VITE_API_URL || '/api'`
+
+### Admin Management UI
+
+Admins can access `/admin` to:
+
+- Create and edit facilities, areas, and assets
+- Activate/deactivate resources (`isActive = false`, no deletion)
+- Configure `requiresApproval` per resource with inline help text
+
+The admin route is protected by `AdminRoute` (frontend) and `requireRole(Role.ADMIN)` on backend mutation endpoints.
+
+### UX Features
+
+- Reusable `PasswordInput` with accessible show/hide toggle on all password fields
+- Lightweight toast notifications for success and error feedback
+- Confirmation modal before approving access requests
+- Rejection modal with required reason
+- Structured access request form with target, period, and reason sections
+- Loading, error, and empty states on all API-driven pages
+- Responsive table/card layouts for mobile
+- Consistent date formatting in the user's local timezone
+
+## Running Tests
+
+```bash
+# Backend (123 tests)
+cd server && npm test
+
+# Frontend (36 tests)
+cd client && npm test
+
+# Production builds
+cd server && npm run build
+cd client && npm run build
+```
 
 ## Authentication
 
@@ -337,7 +372,8 @@ Response:
 5. ~~Access request creation workflow~~
 6. ~~Manager approval and rejection workflow~~
 7. ~~React frontend — authentication, facilities, access requests, manager dashboard~~
-8. Admin management UI + application polish + final testing/review
+8. ~~Admin management UI + application polish + final testing/review~~
+9. Final QA, security review, bug fixing and challenge submission preparation
 
 ## Scripts
 

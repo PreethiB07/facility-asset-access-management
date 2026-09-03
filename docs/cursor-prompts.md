@@ -267,3 +267,37 @@ Commit as: `feat: build react frontend for access management`
 
 - Separate apps per role — rejected; single app with role-based navigation.
 - Duplicating approval/auto-approve logic in frontend — rejected; display driven by API response status.
+
+---
+
+## Stage 8 — Admin Features, UX Polish & Application Quality
+
+### Prompt
+
+Polish UX across all forms and pages; add password visibility toggles; improve loading/error/empty states; responsive design; accessibility; admin CRUD UI for facilities/areas/assets; confirmation dialogs; toast feedback; frontend tests; documentation.
+
+Commit as: `feat: polish ux and add admin management`
+
+### What was generated
+
+- `PasswordInput` component with accessible eye toggle
+- `ToastProvider` for lightweight success/error notifications
+- `ConfirmModal` for approve confirmation (replacing `window.confirm`)
+- Improved login/register validation and password requirements display
+- Restructured access request form with clear sections
+- Admin panels: `FacilityAdminPanel`, `AreaAdminPanel`, `AssetAdminPanel` on `/admin`
+- `AdminRoute` restricting admin pages to ADMIN role
+- Extended facility/area/asset services with create/update API calls
+- Responsive table/card layouts for manager and admin lists
+- Updated frontend tests (36 total including password, admin, manager confirmation)
+
+### Important design decisions
+
+- **No new UI libraries** — toasts and modals implemented with existing CSS/React state
+- **Deactivation over deletion** — admin UI toggles `isActive` consistent with backend
+- **Area/facility validation** — asset form validates area belongs to selected facility client-side; backend remains authoritative
+- **Dual layout** — desktop tables + mobile cards via CSS utility classes
+
+### Rejected suggestions
+
+- Adding a toast library (e.g. react-hot-toast) — rejected; lightweight custom solution sufficient.

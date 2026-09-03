@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import { getErrorMessage } from '../../utils/errors';
 
 interface RejectModalProps {
   requestId: string;
@@ -22,7 +23,8 @@ export default function RejectModal({ requestId, onCancel, onReject }: RejectMod
     setError('');
     try {
       await onReject(requestId, reason.trim());
-    } catch {
+    } catch (err) {
+      setError(getErrorMessage(err));
       setSubmitting(false);
     }
   }
@@ -30,25 +32,32 @@ export default function RejectModal({ requestId, onCancel, onReject }: RejectMod
   return (
     <div className="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="reject-title">
       <div className="modal">
-        <h2 id="reject-title">Reject access request</h2>
+        <h2 id="reject-title">Reject Access Request</h2>
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label htmlFor="rejectionReason">Rejection reason</label>
+            <label htmlFor="rejectionReason">
+              Reason <span className="required-indicator">*</span>
+            </label>
             <textarea
               id="rejectionReason"
-              rows={3}
+              rows={4}
               value={reason}
               onChange={(e) => setReason(e.target.value)}
+              placeholder="Explain why this request is being rejected"
               autoFocus
             />
-            {error && <span className="field-error">{error}</span>}
+            {error && (
+              <span className="field-error" role="alert">
+                {error}
+              </span>
+            )}
           </div>
           <div className="modal-actions">
             <button type="button" className="btn btn-secondary" onClick={onCancel} disabled={submitting}>
               Cancel
             </button>
             <button type="submit" className="btn btn-danger" disabled={submitting}>
-              {submitting ? 'Rejecting...' : 'Confirm reject'}
+              {submitting ? 'Rejecting...' : 'Reject Request'}
             </button>
           </div>
         </form>

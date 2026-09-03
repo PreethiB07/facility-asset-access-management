@@ -3,6 +3,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../App';
 import { AuthProvider } from '../context/AuthContext';
+import { ToastProvider } from '../context/ToastContext';
 import DashboardPage from '../pages/DashboardPage';
 import ProtectedRoute from '../routes/ProtectedRoute';
 import { authApi } from '../services/auth.service';
@@ -41,12 +42,14 @@ describe('Routing', () => {
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
         <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<div>Login page</div>} />
-            <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-            </Route>
-          </Routes>
+          <ToastProvider>
+            <Routes>
+              <Route path="/login" element={<div>Login page</div>} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+              </Route>
+            </Routes>
+          </ToastProvider>
         </AuthProvider>
       </MemoryRouter>,
     );
@@ -69,12 +72,14 @@ describe('Routing', () => {
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
         <AuthProvider>
-          <Routes>
-            <Route path="/login" element={<div>Login page</div>} />
-            <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard" element={<DashboardPage />} />
-            </Route>
-          </Routes>
+          <ToastProvider>
+            <Routes>
+              <Route path="/login" element={<div>Login page</div>} />
+              <Route element={<ProtectedRoute />}>
+                <Route path="/dashboard" element={<DashboardPage />} />
+              </Route>
+            </Routes>
+          </ToastProvider>
         </AuthProvider>
       </MemoryRouter>,
     );
@@ -88,7 +93,9 @@ describe('App routes', () => {
     render(
       <MemoryRouter initialEntries={['/login']}>
         <AuthProvider>
-          <App />
+          <ToastProvider>
+            <App />
+          </ToastProvider>
         </AuthProvider>
       </MemoryRouter>,
     );

@@ -46,7 +46,7 @@ export default function FacilityDetailPage() {
   const independentAssets = useMemo(() => assets.filter((asset) => asset.areaId === null), [assets]);
 
   if (loading) {
-    return <LoadingState message="Loading facility..." />;
+    return <LoadingState message="Loading facility details..." />;
   }
 
   if (error || !facility) {
