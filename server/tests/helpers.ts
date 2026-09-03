@@ -39,20 +39,12 @@ export function authHeader(token: string): { Authorization: string } {
   return { Authorization: `Bearer ${token}` };
 }
 
+import { DEMO_CREDENTIALS } from './demo-users';
+
 export async function getTokenForRole(
   role: 'USER' | 'MANAGER' | 'ADMIN',
 ): Promise<string> {
-  const credentials: Record<'USER' | 'MANAGER' | 'ADMIN', { email: string; env: string }> = {
-    USER: { email: 'user@example.com', env: 'SEED_USER_PASSWORD' },
-    MANAGER: { email: 'manager@example.com', env: 'SEED_MANAGER_PASSWORD' },
-    ADMIN: { email: 'admin@example.com', env: 'SEED_ADMIN_PASSWORD' },
-  };
-
-  const { email, env } = credentials[role];
-  const password = process.env[env];
-  if (!password) {
-    throw new Error(`Missing ${env} for test authentication`);
-  }
+  const { email, password } = DEMO_CREDENTIALS[role];
 
   const response = await loginUser({ email, password });
   if (response.status !== 200) {

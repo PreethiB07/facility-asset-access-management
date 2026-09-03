@@ -319,12 +319,11 @@ describe('GET /api/auth/me', () => {
   });
 });
 
+import { DEMO_CREDENTIALS } from './demo-users';
+
 describe('Role authorization', () => {
-  async function loginSeedUser(email: string, passwordEnv: string): Promise<string> {
-    const password = process.env[passwordEnv];
-    if (!password) {
-      throw new Error(`Missing ${passwordEnv} for authorization tests`);
-    }
+  async function loginSeedUser(role: keyof typeof DEMO_CREDENTIALS): Promise<string> {
+    const { email, password } = DEMO_CREDENTIALS[role];
 
     const response = await loginUser({ email, password });
     expect(response.status).toBe(200);
@@ -332,7 +331,7 @@ describe('Role authorization', () => {
   }
 
   it('allows USER to access USER-protected endpoint', async () => {
-    const token = await loginSeedUser('user@example.com', 'SEED_USER_PASSWORD');
+    const token = await loginSeedUser('USER');
     const response = await request(app)
       .get('/api/auth/protected-test/user')
       .set(authHeader(token));
@@ -341,7 +340,7 @@ describe('Role authorization', () => {
   });
 
   it('denies USER access to MANAGER endpoint', async () => {
-    const token = await loginSeedUser('user@example.com', 'SEED_USER_PASSWORD');
+    const token = await loginSeedUser('USER');
     const response = await request(app)
       .get('/api/auth/protected-test/manager')
       .set(authHeader(token));
@@ -351,7 +350,7 @@ describe('Role authorization', () => {
   });
 
   it('allows MANAGER to access MANAGER endpoint', async () => {
-    const token = await loginSeedUser('manager@example.com', 'SEED_MANAGER_PASSWORD');
+    const token = await loginSeedUser('MANAGER');
     const response = await request(app)
       .get('/api/auth/protected-test/manager')
       .set(authHeader(token));
@@ -360,7 +359,7 @@ describe('Role authorization', () => {
   });
 
   it('allows ADMIN to access ADMIN endpoint', async () => {
-    const token = await loginSeedUser('admin@example.com', 'SEED_ADMIN_PASSWORD');
+    const token = await loginSeedUser('ADMIN');
     const response = await request(app)
       .get('/api/auth/protected-test/admin')
       .set(authHeader(token));
@@ -369,7 +368,7 @@ describe('Role authorization', () => {
   });
 
   it('returns 403 for unauthorized role', async () => {
-    const token = await loginSeedUser('user@example.com', 'SEED_USER_PASSWORD');
+    const token = await loginSeedUser('USER');
     const response = await request(app)
       .get('/api/auth/protected-test/admin')
       .set(authHeader(token));

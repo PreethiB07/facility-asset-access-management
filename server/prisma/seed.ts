@@ -8,74 +8,84 @@ const prisma = new PrismaClient();
 
 const SALT_ROUNDS = 12;
 
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-  return value;
-}
+/** Development/demo accounts — fake challenge-only credentials documented in docs/demo-accounts.md */
+const DEMO_ACCOUNTS = [
+  {
+    email: 'demo.admin@example.com',
+    name: 'Demo Admin',
+    role: Role.ADMIN,
+    password: 'DemoAdmin@123',
+  },
+  {
+    email: 'demo.manager@example.com',
+    name: 'Demo Manager',
+    role: Role.MANAGER,
+    password: 'DemoManager@123',
+  },
+  {
+    email: 'demo.user@example.com',
+    name: 'Demo User',
+    role: Role.USER,
+    password: 'DemoUser@123',
+  },
+] as const;
 
 async function hashPassword(password: string): Promise<string> {
   return bcrypt.hash(password, SALT_ROUNDS);
 }
 
+async function upsertDemoUsers() {
+  const users: Record<string, { id: string; email: string }> = {};
+
+  for (const account of DEMO_ACCOUNTS) {
+    const passwordHash = await hashPassword(account.password);
+    const user = await prisma.user.upsert({
+      where: { email: account.email },
+      update: {
+        name: account.name,
+        passwordHash,
+        role: account.role,
+        isActive: true,
+      },
+      create: {
+        name: account.name,
+        email: account.email,
+        passwordHash,
+        role: account.role,
+        isActive: true,
+      },
+    });
+    users[account.role] = { id: user.id, email: user.email };
+  }
+
+  return {
+    admin: users[Role.ADMIN],
+    manager: users[Role.MANAGER],
+    user: users[Role.USER],
+  };
+}
+
 async function main() {
-  const [adminHash, managerHash, userHash] = await Promise.all([
-    hashPassword(requireEnv('SEED_ADMIN_PASSWORD')),
-    hashPassword(requireEnv('SEED_MANAGER_PASSWORD')),
-    hashPassword(requireEnv('SEED_USER_PASSWORD')),
-  ]);
+  const { admin, manager, user } = await upsertDemoUsers();
 
   await prisma.accessRequest.deleteMany();
   await prisma.asset.deleteMany();
   await prisma.area.deleteMany();
   await prisma.facility.deleteMany();
-  await prisma.user.deleteMany();
 
-  const admin = await prisma.user.create({
+  const mainOperations = await prisma.facility.create({
     data: {
-      name: 'System Admin',
-      email: 'admin@example.com',
-      passwordHash: adminHash,
-      role: Role.ADMIN,
-      isActive: true,
-    },
-  });
-
-  const manager = await prisma.user.create({
-    data: {
-      name: 'Facility Manager',
-      email: 'manager@example.com',
-      passwordHash: managerHash,
-      role: Role.MANAGER,
-      isActive: true,
-    },
-  });
-
-  const user = await prisma.user.create({
-    data: {
-      name: 'Normal User',
-      email: 'user@example.com',
-      passwordHash: userHash,
-      role: Role.USER,
-      isActive: true,
-    },
-  });
-
-  const activeFacility = await prisma.facility.create({
-    data: {
-      name: 'Main Campus',
-      description: 'Primary facility with multiple areas and assets',
+      name: 'Main Operations Facility',
+      description: 'Primary operations hub with controlled areas and equipment',
       isActive: true,
       requiresApproval: true,
     },
   });
 
-  const autoApproveFacility = await prisma.facility.create({
+  const productionFacility = await prisma.facility.create({
     data: {
-      name: 'Open Access Building',
-      description: 'Facility with auto-approved access requests',
+      name: 'Production Facility',
+      description: 'Manufacturing and production floor access',
       isActive: true,
       requiresApproval: false,
     },
@@ -84,70 +94,80 @@ async function main() {
   const inactiveFacility = await prisma.facility.create({
     data: {
       name: 'Decommissioned Warehouse',
-      description: 'Inactive facility for testing inactive-resource scenarios',
+      description: 'Inactive facility retained for historical access records',
       isActive: false,
       requiresApproval: true,
     },
   });
 
-  const area1 = await prisma.area.create({
+  const serverRoom = await prisma.area.create({
     data: {
-      facilityId: activeFacility.id,
-      name: 'Area 1',
-      description: 'First area in Main Campus',
+      facilityId: mainOperations.id,
+      name: 'Server Room',
+      description: 'Climate-controlled data center area',
       isActive: true,
       requiresApproval: true,
     },
   });
 
-  const area2 = await prisma.area.create({
+  const equipmentRoom = await prisma.area.create({
     data: {
-      facilityId: activeFacility.id,
-      name: 'Area 2',
-      description: 'Second area in Main Campus',
+      facilityId: mainOperations.id,
+      name: 'Equipment Room',
+      description: 'Shared tools and maintenance equipment',
       isActive: true,
       requiresApproval: false,
     },
   });
 
-  const inactiveArea = await prisma.area.create({
+  const productionFloor = await prisma.area.create({
     data: {
-      facilityId: activeFacility.id,
-      name: 'Closed Area',
-      description: 'Inactive area for testing',
+      facilityId: productionFacility.id,
+      name: 'Production Floor',
+      description: 'Active manufacturing workspace',
+      isActive: true,
+      requiresApproval: false,
+    },
+  });
+
+  const closedArea = await prisma.area.create({
+    data: {
+      facilityId: mainOperations.id,
+      name: 'Closed Storage',
+      description: 'Inactive area for testing inactive-resource scenarios',
       isActive: false,
       requiresApproval: true,
     },
   });
 
-  const asset1 = await prisma.asset.create({
+  const generator = await prisma.asset.create({
     data: {
-      facilityId: activeFacility.id,
-      areaId: area1.id,
-      name: 'Asset 1',
-      description: 'Equipment in Area 1',
+      facilityId: mainOperations.id,
+      areaId: equipmentRoom.id,
+      name: 'Generator',
+      description: 'Backup power generator',
       isActive: true,
       requiresApproval: true,
     },
   });
 
-  const asset2 = await prisma.asset.create({
+  const forklift = await prisma.asset.create({
     data: {
-      facilityId: activeFacility.id,
-      areaId: area1.id,
-      name: 'Asset 2',
-      description: 'Secondary equipment in Area 1',
+      facilityId: productionFacility.id,
+      areaId: productionFloor.id,
+      name: 'Forklift',
+      description: 'Electric forklift for material handling',
       isActive: true,
       requiresApproval: false,
     },
   });
 
-  const asset3 = await prisma.asset.create({
+  const securityCamera = await prisma.asset.create({
     data: {
-      facilityId: activeFacility.id,
-      areaId: area2.id,
-      name: 'Asset 3',
-      description: 'Equipment in Area 2',
+      facilityId: mainOperations.id,
+      areaId: serverRoom.id,
+      name: 'Security Camera',
+      description: 'Networked surveillance camera',
       isActive: true,
       requiresApproval: true,
     },
@@ -155,20 +175,20 @@ async function main() {
 
   const independentAsset = await prisma.asset.create({
     data: {
-      facilityId: activeFacility.id,
+      facilityId: mainOperations.id,
       areaId: null,
       name: 'Independent Asset',
-      description: 'Asset assigned directly to facility without an area',
+      description: 'Facility-level asset not assigned to any area',
       isActive: true,
       requiresApproval: true,
     },
   });
 
-  const inactiveAsset = await prisma.asset.create({
+  const retiredAsset = await prisma.asset.create({
     data: {
-      facilityId: activeFacility.id,
-      areaId: area2.id,
-      name: 'Retired Asset',
+      facilityId: mainOperations.id,
+      areaId: equipmentRoom.id,
+      name: 'Retired Compressor',
       description: 'Inactive asset for testing',
       isActive: false,
       requiresApproval: true,
@@ -182,48 +202,52 @@ async function main() {
     data: [
       {
         requesterId: user.id,
-        facilityId: activeFacility.id,
+        facilityId: mainOperations.id,
         accessType: AccessType.TEMPORARY,
         startAt: now,
         endAt: oneWeekLater,
-        reason: 'Temporary facility access for project work',
+        reason: 'Temporary facility access for scheduled maintenance',
         status: AccessRequestStatus.PENDING,
       },
       {
         requesterId: user.id,
-        areaId: area1.id,
+        areaId: serverRoom.id,
         accessType: AccessType.PERMANENT,
         startAt: now,
         endAt: null,
-        reason: 'Permanent area access for daily operations',
+        reason: 'Permanent server room access for daily operations',
         status: AccessRequestStatus.APPROVED,
         approvedById: manager.id,
         approvedAt: now,
       },
       {
         requesterId: user.id,
-        assetId: asset1.id,
+        assetId: generator.id,
         accessType: AccessType.TEMPORARY,
         startAt: now,
         endAt: oneWeekLater,
-        reason: 'Temporary asset access for maintenance',
+        reason: 'Generator inspection and testing',
         status: AccessRequestStatus.REJECTED,
         approvedById: manager.id,
         approvedAt: now,
-        rejectionReason: 'Insufficient justification provided',
+        rejectionReason: 'Insufficient justification provided for generator access',
       },
     ],
   });
 
   console.log('Seed completed successfully.');
-  console.log(`Users: admin (${admin.email}), manager (${manager.email}), user (${user.email})`);
+  console.log('Demo accounts (development/challenge only):');
+  for (const account of DEMO_ACCOUNTS) {
+    console.log(`  ${account.role}: ${account.email}`);
+  }
   console.log(
-    `Facilities: ${activeFacility.name}, ${autoApproveFacility.name}, ${inactiveFacility.name}`,
+    `Facilities: ${mainOperations.name}, ${productionFacility.name}, ${inactiveFacility.name}`,
   );
-  console.log(`Areas: ${area1.name}, ${area2.name}, ${inactiveArea.name}`);
+  console.log(`Areas: ${serverRoom.name}, ${equipmentRoom.name}, ${productionFloor.name}, ${closedArea.name}`);
   console.log(
-    `Assets: ${asset1.name}, ${asset2.name}, ${asset3.name}, ${independentAsset.name}, ${inactiveAsset.name}`,
+    `Assets: ${generator.name}, ${forklift.name}, ${securityCamera.name}, ${independentAsset.name}, ${retiredAsset.name}`,
   );
+  console.log(`Seeded by admin id: ${admin.id}, manager id: ${manager.id}, user id: ${user.id}`);
 }
 
 main()
