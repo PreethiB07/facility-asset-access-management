@@ -64,7 +64,7 @@ Registration always assigns **USER**. MANAGER/ADMIN accounts come from seed data
 - No admin UI for user/role management (see [docs/known-issues.md](docs/known-issues.md))
 - No password reset or email verification
 - JWT stored in `localStorage` (standard SPA pattern; use HTTPS in production)
-- Browser E2E tests not automated; API + component tests cover business logic (see [docs/known-issues.md](docs/known-issues.md))
+- Playwright browser E2E tests cover critical user journeys (see [docs/e2e-testing.md](docs/e2e-testing.md))
 
 ## Purpose
 

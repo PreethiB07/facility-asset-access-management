@@ -1,6 +1,6 @@
 # Known Issues
 
-Documented limitations as of Stage 16 multi-company checkpoint (`5210340`+).
+Documented limitations as of Stage 17 E2E checkpoint.
 
 ---
 
@@ -40,8 +40,9 @@ Documented limitations as of Stage 16 multi-company checkpoint (`5210340`+).
 
 | Issue | Impact | Notes |
 |-------|--------|-------|
-| No browser E2E suite | UI multi-company flows not automated in Playwright/Cypress | API-level regression in `multi-company-regression.test.ts` + `company-isolation.test.ts` |
-| Test parallel file execution | Rare cross-file pollution if cleanup fails | Prefix-based cleanup; 173 tests passing |
+| Playwright E2E uses shared dev DB | Admin tests create `E2E Admin …` facilities; registration creates users | No DB reset; `workers: 1` reduces contention |
+| Admin area/asset modal + Playwright | Browser cannot reliably submit admin area/asset modals | Admin E2E creates facility in UI; area/asset via API helpers with UI verification |
+| Test parallel file execution | Rare cross-file pollution if cleanup fails | Prefix-based cleanup; 173 server + 42 client + 30 E2E tests passing |
 
 ---
 
