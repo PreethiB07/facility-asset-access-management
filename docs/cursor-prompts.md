@@ -75,3 +75,44 @@ Commit as: `chore: configure prisma database and seed data`
 
 - Prisma 8 RC / Prisma 7 — engine/version mismatch and new config format; not suitable for this stage.
 - Hardcoded seed passwords in source — replaced with env-var-based hashing.
+
+---
+
+## Stage 3 — JWT Authentication & Authorization
+
+### Prompt
+
+Implement secure authentication and role-based authorization: `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`; JWT middleware; `requireRole` middleware; Zod validation; consistent error format; Vitest + Supertest API tests; protected test routes.
+
+Commit as: `feat: implement jwt authentication and authorization`
+
+### What was generated
+
+- `server/src/services/auth.service.ts` — register, login, getUserById
+- `server/src/middleware/authenticate.middleware.ts` — JWT auth + `requireRole`
+- `server/src/middleware/error.middleware.ts` — centralized error handler
+- `server/src/controllers/auth.controller.ts` — auth route handlers
+- `server/src/routes/auth.routes.ts` — auth and protected-test routes
+- `server/src/validators/auth.validators.ts` — Zod schemas
+- `server/src/utils/jwt.util.ts` — sign/verify JWT
+- `server/tests/auth.test.ts` — 28 automated API tests
+
+### Review notes
+
+- Existing Prisma `User` model reused without schema changes.
+- Registration always assigns `USER` role; no client-controlled role escalation.
+- Login returns generic "Invalid email or password" to avoid account enumeration.
+- Inactive users blocked at login (403) and on authenticated requests (403).
+- Test users use `@auth-test.example.com` domain and are cleaned up after tests.
+
+### Important design decisions
+
+- **JWT payload minimal:** only `userId` and `role`; user re-fetched from DB on each request to verify active status.
+- **Exact role matching:** `requireRole('MANAGER')` does not grant access to ADMIN users unless both roles are listed.
+- **Zod at API boundary:** all request bodies validated before service layer.
+- **Protected test routes** under `/api/auth/protected-test/*` for middleware verification only.
+
+### Rejected suggestions
+
+- Trusting role from JWT alone without DB lookup for `isActive` — rejected; middleware re-validates user state.
+- Allowing role selection during registration — rejected per security requirements.
