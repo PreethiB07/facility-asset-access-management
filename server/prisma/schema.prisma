@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  MANAGER
+  ADMIN
+}
+
+enum AccessType {
+  TEMPORARY
+  PERMANENT
+}
+
+enum AccessRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  accessRequests   AccessRequest[] @relation("RequesterAccessRequests")
+  approvedRequests AccessRequest[] @relation("ApproverAccessRequests")
+}
+
+model Facility {
+  id               String   @id @default(uuid())
+  name             String
+  description      String?
+  isActive         Boolean  @default(true)
+  requiresApproval Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  areas          Area[]
+  assets         Asset[]
+  accessRequests AccessRequest[]
+}
+
+model Area {
+  id               String   @id @default(uuid())
+  facilityId       String
+  name             String
+  description      String?
+  isActive         Boolean  @default(true)
+  requiresApproval Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  facility       Facility        @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  assets         Asset[]
+  accessRequests AccessRequest[]
+}
+
+model Asset {
+  id               String   @id @default(uuid())
+  facilityId       String
+  areaId           String?
+  name             String
+  description      String?
+  isActive         Boolean  @default(true)
+  requiresApproval Boolean  @default(true)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  facility       Facility        @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  area           Area?           @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  accessRequests AccessRequest[]
+}
+
+model AccessRequest {
+  id              String              @id @default(uuid())
+  requesterId     String
+  facilityId      String?
+  areaId          String?
+  assetId         String?
+  accessType      AccessType
+  startAt         DateTime
+  endAt           DateTime?
+  reason          String
+  status          AccessRequestStatus @default(PENDING)
+  approvedById    String?
+  approvedAt      DateTime?
+  rejectionReason String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  requester  User      @relation("RequesterAccessRequests", fields: [requesterId], references: [id], onDelete: Restrict)
+  facility   Facility? @relation(fields: [facilityId], references: [id], onDelete: Restrict)
+  area       Area?     @relation(fields: [areaId], references: [id], onDelete: Restrict)
+  asset      Asset?    @relation(fields: [assetId], references: [id], onDelete: Restrict)
+  approvedBy User?     @relation("ApproverAccessRequests", fields: [approvedById], references: [id], onDelete: SetNull)
+
+  @@index([requesterId])
+  @@index([status])
+  @@index([facilityId])
+  @@index([areaId])
+  @@index([assetId])
+  @@index([startAt])
+  @@index([endAt])
+}
