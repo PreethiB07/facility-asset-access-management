@@ -64,7 +64,7 @@ Registration always assigns **USER**. MANAGER/ADMIN accounts come from seed data
 - No admin UI for user/role management (see [docs/known-issues.md](docs/known-issues.md))
 - No password reset or email verification
 - JWT stored in `localStorage` (standard SPA pattern; use HTTPS in production)
-- Browser E2E tests not automated; API + component tests cover business logic
+- Browser E2E tests not automated; API + component tests cover business logic (see [docs/known-issues.md](docs/known-issues.md))
 
 ## Purpose
 
@@ -325,10 +325,10 @@ The admin route is protected by `AdminRoute` (frontend) and `requireRole(Role.AD
 ## Running Tests
 
 ```bash
-# Backend (123 tests)
+# Backend (173 tests)
 cd server && npm test
 
-# Frontend (36 tests)
+# Frontend (42 tests)
 cd client && npm test
 
 # Type checking

@@ -1,49 +1,53 @@
 # Known Issues
 
-Documented at final QA (Stage 9). Only genuine, non-critical items are listed.
+Documented limitations as of Stage 16 multi-company checkpoint (`5210340`+).
 
 ---
 
-## Issue: No automated browser E2E tests
+## Database & Environment
 
-**Impact:** Full user journeys (register → login → browse → request → approve) are verified via API/component tests and manual walkthrough, not Playwright/Cypress.
-
-**Workaround:** Run backend + frontend locally and follow the manual test flows in the README.
-
-**Future improvement:** Add Playwright or Cypress smoke tests for critical paths.
-
----
-
-## Issue: Admin cannot reassign an area to a different facility when editing
-
-**Impact:** Admins must create a new area under the correct facility if a area was assigned to the wrong facility initially.
-
-**Workaround:** Deactivate the incorrect area and create a new one under the intended facility.
-
-**Future improvement:** Allow facility change on area edit with backend validation.
+| Issue | Impact | Workaround |
+|-------|--------|------------|
+| `faam_app` role required for runtime | RLS not enforced if `DATABASE_URL` uses `postgres` superuser | Use `DATABASE_URL=postgresql://faam_app:faam_app_dev@...` (see `server/.env.example`) |
+| Migrations need elevated role | `prisma migrate deploy` uses `DATABASE_DIRECT_URL` (postgres) | Set both URLs in `.env` |
+| `prisma generate` EPERM on Windows | DLL locked when dev server is running | Stop server before `db:seed` / `prisma generate` |
+| `db:seed` runs `prisma generate &&` | May fail on Windows with server running | Run `tsx prisma/seed.ts` directly |
 
 ---
 
-## Issue: No admin UI for user/role management
+## Multi-Company
 
-**Impact:** MANAGER and ADMIN accounts must be created via database seed or direct DB update; public registration always creates USER.
-
-**Workaround:** Use `npm run db:seed` to create demo MANAGER/ADMIN accounts. See [docs/demo-accounts.md](demo-accounts.md).
-
-**Future improvement:** Admin user management screen with role assignment audit trail.
-
----
-
-## Issue: JWT stored in localStorage
-
-**Impact:** Standard SPA tradeoff; tokens are vulnerable to XSS if malicious scripts run in the app origin.
-
-**Workaround:** Backend enforces short-ish TTL via `JWT_EXPIRES_IN`; no sensitive data in JWT payload; CSP recommended for production deployment.
-
-**Future improvement:** HttpOnly cookie-based session or refresh-token rotation for production hardening.
+| Issue | Impact | Notes |
+|-------|--------|-------|
+| No admin user-management API | Admins cannot list/edit users via REST | User CRUD is seed/demo only; admin isolation tested for facilities/areas/assets |
+| No platform-level super-admin | Each admin is tenant-scoped | By design for Stage 13–16 |
+| Company name globally unique | Cannot have two companies with same name | Schema constraint |
+| Login by email only | Same email in two companies requires password match loop | First matching password wins |
 
 ---
 
-## Critical issues
+## PostgreSQL RLS
 
-**No known critical issues at final QA.** All 159 automated tests pass; authorization and business rules are enforced server-side.
+| Issue | Impact | Notes |
+|-------|--------|-------|
+| `postgres` superuser bypasses RLS | Dev misconfiguration could skip RLS | Production must use `faam_app` (no `BYPASSRLS`) |
+| Bootstrap context for seed/tests | `runWithSystemBootstrap` bypasses RLS intentionally | Not available to normal API paths |
+| Nested Prisma transactions | Each API call uses its own transaction scope | Acceptable; context is transaction-local |
+
+---
+
+## Testing
+
+| Issue | Impact | Notes |
+|-------|--------|-------|
+| No browser E2E suite | UI multi-company flows not automated in Playwright/Cypress | API-level regression in `multi-company-regression.test.ts` + `company-isolation.test.ts` |
+| Test parallel file execution | Rare cross-file pollution if cleanup fails | Prefix-based cleanup; 173 tests passing |
+
+---
+
+## Frontend
+
+| Issue | Impact | Notes |
+|-------|--------|-------|
+| No tenant switcher UI | Users cannot select company in UI | Company derived from login account |
+| `companyId` not shown in most UI | Informational only | Available on `/api/auth/me` |

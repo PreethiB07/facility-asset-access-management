@@ -163,3 +163,5 @@ This is verified in `server/tests/rls-isolation.test.ts`.
 ## Next Stage
 
 Full regression testing, migration verification on fresh and existing databases, and multi-company end-to-end testing.
+
+**Stage 16 checkpoint complete:** 173 backend tests passing; see [known-issues.md](./known-issues.md).

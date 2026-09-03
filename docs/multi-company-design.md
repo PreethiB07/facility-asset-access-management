@@ -154,7 +154,11 @@ Client-supplied `companyId` in request bodies is ignored (Zod strips unknown fie
 | Test file | Coverage |
 |-----------|----------|
 | `company-isolation.test.ts` | Cross-company 404s, manager/admin isolation, tampering |
+| `multi-company-regression.test.ts` | Stage 16 E2E API flows, migration integrity |
+| `rls-isolation.test.ts` | Database-level RLS without app filters |
 | `auth.test.ts`, `resources.test.ts`, etc. | Regression — all pass with company-scoped queries |
+
+**Checkpoint (Stage 16):** 173 backend tests passing; API + RLS isolation verified for Acme and Globex.
 
 ### Isolation tests implemented
 

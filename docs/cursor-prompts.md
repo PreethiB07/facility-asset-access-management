@@ -431,3 +431,17 @@ Add database-level company isolation via PostgreSQL RLS, transaction-local sessi
 ### Next stage
 
 Full regression testing, migration verification, and multi-company end-to-end testing.
+
+---
+
+## Stage 16 — Multi-Company Regression & Checkpoint
+
+### Prompt
+
+Verify multi-company requirement across full stack; run regression tests; document known issues; checkpoint report.
+
+### What was implemented
+
+- `tests/multi-company-regression.test.ts` — tenant visibility, manager/admin isolation, E2E access flow, migration integrity
+- `docs/known-issues.md` — documented limitations
+- 173 backend + 42 frontend tests passing
